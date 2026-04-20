@@ -1,0 +1,506 @@
+{% load static %}
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	<title>Электронный тематический словарь архангельских говоров</title>
+	<meta name="keywords" content="" />
+	<meta name="description" content="В электронном словаре архангельских говоров на данный момент представлена диалектная лексика, относящаяся к тематической группе «Одежда, обувь, головные уборы, украшения, ткани», включая подгруппы «Общее название одежды», «Качественная характеристика одежды», «Женская верхняя одежда», «Женское нижнее бельё», «Женское нижнее белье», «Легкое женское платье», «Сарафаны», «Юбки», «Фартуки», «Мужская одежда», «Одежда, которую могут носить и мужчины, и женщины», «Детская одежда», «Названия составных частей одежды», «Лексика, связанная с ношением одежды», «Названия материалов, из которых делалась одежда», «Женские головные уборы, платки и шарфы», «Мужские головные уборы», «Общие головные уборы», «Способы ношения головных уборов», «Рукавицы, варежки, перчатки», «Обувь», «Части обуви», «Лексика, связанная с ношением обуви», «Носки, чулки и портянки», «Постельные принадлежности», «Скатерти, полотенца, салфетки», «Лексика, связанная с изготовлением и починкой одежды и обуви», «Способ ношения одежды, внешний вид», «Украшения».
+
+Слова расположены в алфавитном порядке, у каждого слова указана тематическая группа." />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta charset="UTF-8">
+	<link rel="icon" href="{% static 'images/favicon.ico' %}">
+	<link href="{% static 'css/style.css' %}" rel="stylesheet" type="text/css" media="screen" />
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bitter&display=swap" rel="stylesheet"> 
+
+
+</head>
+<body>
+<a name='top'></a>
+<div class='header'>
+	
+	<div class='narfu_logo'><img src="{% static 'images/narfu_logo.svg' %}"/></div>
+	<div class='dict_title'><h1>Электронный тематический словарь архангельских говоров</h1></div>
+	<ul class='dict_link_nav'>
+		<li class='dict_link'><a href='#project'>О проекте</a></li>
+		<li class='dict_link'><a href='#researches'>Публикации</a></li>
+	</ul>
+<!--	<div class='dict_link' width='24 px'></div> кто ты и откуда -->
+</div>
+<div class='index_container'>
+
+<div class='cover'>
+	<img src="{% static 'images/cover.webp' %}" alt='Иринич Л.П., Паршина Е.И. Няндомский район, село Моша. Три дома на берегу (акварель)' title='Иринич Л.П., Паршина Е.И. Няндомский район, село Моша. Три дома на берегу (акварель)' class='cover_img'>
+	
+</div>
+<div class='href_button_container'><a href="{% url 'dictionary' %}" class='href_button'>Cловарь</a><a href="{% url 'map' %}" class='href_button'>Атлас</a></div>
+<h1><a name='project'>О проекте</a></h1>
+<div class='prolog'>
+<div class='text' id='first'>
+			<p>Русский Север является подлинной сокровищницей русской культуры, был и&nbsp;остается неисчерпаемым источником для изучения подлинно народного словотворчества, живого народного слова.</p>
+			<p>Диалекты постепенно разрушаются, испытывая постоянное воздействие литературной нормы и&nbsp;не&nbsp;имея письменной традиции, поэтому отсутствие должного внимания к&nbsp;народной речи лишает исследователей ценного лингвистического материала, утрата которого с&nbsp;течением времени оказывается невосполнимой. Стихия живой народной речи может и&nbsp;должна быть зафиксирована в&nbsp;словарях, научных филологических трудах, художественной литературе, публицистике, поскольку такая фиксация является надежным способом сбережения и&nbsp;приумножения речевого богатства народа.</p>
+			
+		</div>
+		<div class='text'>
+		<p>Богатейший диалектный материал, собранный в&nbsp;диалектологических экспедициях по&nbsp;Архангельской области и&nbsp;хранящийся в&nbsp;картотеке кафедры русского языка и&nbsp;речевой культуры Высшей школы социально-гуманитарных наук и&nbsp;международной коммуникации Северного (Арктического) федерального университета имени М.В.&nbsp;Ломоносова, позволяет создать словарь архангельских говоров, в&nbsp;котором слова группируются по&nbsp;тематическому принципу; до&nbsp;сих&nbsp;пор подобного издания не&nbsp;было. Такая подача материала позволяет отразить разные формы быта и&nbsp;хозяйственной деятельности северян, их&nbsp;представления об&nbsp;окружающем мире и&nbsp;людях. Материалы словаря могут послужить источником реконструкции традиционной картины мира архангельского крестьянина.</p>
+			<p>Сегодня исследовательская группа Северного (Арктического) федерального университета имени М.В.&nbsp;Ломоносова реализует проект «Тематический словарь архангельских говоров с&nbsp;электронной поддержкой», поддержанный Российским научным фондом.</p>
+			
+
+		</div>
+		<img src="{% static 'images/block_1.webp' %}" alt="Лешукова Н., Машина О., Терещенко Г., Евсеева Е. Лешуконский район, село Вожгора, 1984 г." title="Лешукова Н., Машина О., Терещенко Г., Евсеева Е. Лешуконский район, село Вожгора, 1984 г."/>
+		<img src="{% static 'images/block_2.webp' %}"' alt="Пономарёва С., Яковлева Е., Ляпшина М. Плесецкий район, село Вершинино. Тырлова Марфа Алексеевна (1900 г.р.)" title="Пономарёва С., Яковлева Е., Ляпшина М. Плесецкий район, деревня Вершинино. Тырлова Марфа Алексеевна (1900 г.р.)"/>
+		<div class='text'>
+		<p>Главная ценность такого словаря состоит в&nbsp;отражении народного духа, в&nbsp;стремлении сберечь, сохранить, донести до&nbsp;потомков сокровищницу родниковой, экологически чистой народной речи, продолжить исконные народные традиции, определяющие основы народной духовности, формирующие архетипы национальной культуры.</p>
+			<p>Работа над&nbsp;лексическим атласом русских народных говоров велась с&nbsp;шестидесятых годов прошлого века. Десятилетиями студенты вместе с&nbsp;преподавателями в&nbsp;диалектологических экспедициях собирали материал, который явился неисчерпаемым источником для&nbsp;изучения живого северного слова. Материал, собранный на&nbsp;территории Архангельской области, хранится на&nbsp;кафедре русского языка и&nbsp;речевой культуры Высшей школы социально-гуманитарных наук и&nbsp;международной коммуникации Северного (Арктического) федерального университета имени М.В.&nbsp;Ломоносова.</p>
+		</div>
+
+</div>
+
+<h1><a name='researches'>Список публикаций</a></h1>
+<div class='sources'>
+	<div class='one_source'>
+		Ненашева, Л. В. Электронный словарь архангельских говоров / Л. В. Ненашева, Л. С. Шурыкина // Арктика и Север. – 2024. – № 55. – С. 243-252. – <a href="https://doi.org/10.37482/issn2221-2698.2024.55.243">DOI 10.37482/issn2221-2698.2024.55.243.</a> – <a href="https://elibrary.ru/item.asp?id=67354063">EDN FNZTOZ</a>. 
+	</div>
+	<div class='one_source'>
+		Ненашева, Л. В. Тематический словарь архангельских говоров / Л. В. Ненашева. – Архангельск : Общество с ограниченной ответственностью "Консультационное информационно-рекламное агентство", 2023. – 192 с. – ISBN 978-5-98450-831-5. – EDN BIDECD. <a href="https://elibrary.ru/item.asp?id=60057405">URL: https://elibrary.ru/item.asp?id=60057405</a>
+	</div>
+		<div class='one_source'>
+		Свидетельство о государственной регистрации программы для ЭВМ № 2023668038 Российская Федерация. Программа для заполнения базы данных диалектных слов "Копилка слов": № 2023667071: заявл. 15.08.2023: опубл. 22.08.2023 / Л. С. Шурыкина, Е. А. Латухина, Л. В. Ненашева; заявитель Федеральное государственное автономное образовательное учреждение высшего образования «Северный федеральный университет имени М.В. Ломоносова». – <a href="https://elibrary.ru/item.asp?id=54649795">URL: https://elibrary.ru/item.asp?id=54649795</a>.
+	</div>
+<div class='one_source'>
+		Ненашева Л.В. Названия одежды в архангельских говорах // Северное слово в памятниках письменности и народных говорах: памяти В.Я. Дерягина и Л.П. Комягиной: монография. – Архангельск: КИРА, 2017. – С. 40–64.
+	</div>
+	<button id="toggleButton" onclick="toggleBlock();">Развернуть</button>
+	<div class="sources_cut collapsed">
+	<div class='one_source'>
+		Шурыкина Л.С. Разработка прототипа информационной системы управления корпусом архангельских говоров // Ломоносовские научные чтения студентов, аспирантов и молодых ученых – 2023. – Том 2. – Сев. (Арктич.) федер. ун-т им. М.В. Ломоносова. – 2023. – С. 806-810. <a href="https://www.elibrary.ru/item.asp?id=54251267">URL: https://www.elibrary.ru/item.asp?id=54251267</a>
+	</div>
+	<div class='one_source'>
+		Свидетельство о государственной регистрации программы для ЭВМ № 2023668189 Российская Федерация. Корпусный менеджер "Карманный корпус v1.0": № 2023667028: заявл. 15.08.2023: опубл. 24.08.2023 / Л. С. Шурыкина, Е. А. Латухина; заявитель Федеральное государственное автономное образовательное учреждение высшего образования «Северный федеральный университет имени М.В. Ломоносова». – <a href="https://elibrary.ru/item.asp?id=54649961">URL: https://elibrary.ru/item.asp?id=54649961</a>.
+	</div>
+	<div class='one_source'>
+		Кузьмина А.М.-Г. Наименования построек и их частей в архангельских говорах: дис. ... канд. филол. наук: 5.9.5 / А.М.Г. Кузьмина. – Архангельск, 2023. – 219 с.
+	</div>
+	<div class='one_source'>
+		Кузьмина А.М.-Г. История собирания и изучения архангельских говоров // Лекантовские чтения – 2022. – Московский государственный областной педагогический университет. – 2022. – С. 234-238. <a href="https://elibrary.ru/yxvbfe">URL: https://elibrary.ru/yxvbfe</a>
+	</div>
+	<div class='one_source'>
+		Кузьмина А.М.-Г. Наименования помещений и пристроек, примыкающих к жилой части дома, в говорах Архангельской области / А.М.-Г. Кузьмина // Филологические науки. Вопросы теории и практики. – 2022. – №12. – С.  3843–3848. <a href="https://gramota.net/materials/2/2022/12/27.html">URL: https://gramota.net/materials/2/2022/12/27.html</a>
+	</div>
+	<div class='one_source'>
+		Ненашева Л.В. Для каждой одёжки своя застёжка // Cuadernos de Rusística Española. № 17. Испания. Гранада. Гранадский университет, 2021. С. 211 – 221. DOI: 10.30827/cre.v17.21023.
+	</div>
+	<div class='one_source'>
+		Кузьмина А.М.-Г. Названия дома и его частей в говорах Архангельской области / А.М.-Г. Кузьмина // Вестник Северного (Арктического) федерального университета. Серия: Гуманитарные и социальные науки. – 2021. – № 2. – С. 60–69. <a href="https://elibrary.ru/item.asp?id=45614027">URL: https://elibrary.ru/item.asp?id=45614027</a>
+	</div>
+	<div class='one_source'>
+		Кузьмина А.М.-Г. Названия хозяйственных построек в говорах Архангельской области / А.М.-Г. Кузьмина // Вестник Череповецкого государственного университета. – 2021. – № 6. – С. 54–64. <a href="https://elibrary.ru/item.asp?id=47344271">URL: https://elibrary.ru/item.asp?id=47344271</a>
+	</div>
+		<div class='one_source'>
+		Ненашева Л.В. Наименования зимней одежды и рукавиц в архангельских говорах // Проблемы изучения, экспонирования и реставрации верхней одежды народов России: материалы научно-практической конференции. – Архангельск, 2020. – С. 71–79.
+	</div>
+	<div class='one_source'>
+		Кузьмина А.М.-Г. Архитектурно-строительная лексика, бытующая на территории Мезенского района Архангельской области / А.М.-Г. Кузьмина // Рациональное и эмоциональное в русском языке – 2019: сборник трудов Международной научной конференции, посв. памяти проф. П. А. Леканта. – М.: МГОУ, 2019. – С. 203–206. <a href="https://elibrary.ru/item.asp?id=42428910">URL: https://elibrary.ru/item.asp?id=42428910</a>
+	</div>
+	<div class='one_source'>
+		Ненашева Л.В. Название верхней и зимней одежды в архангельских говорах // Актуальные проблемы и перспективы русистики. Материалы по итогам Международной конференции русистов в Барселонском университете, МКР-Барселона 2018. – Barcelona (Spain): Издательство / Published by: Trialba Ediciones, 2018. –  С. 1354–1363. <a href="https://elibrary.ru/item.asp?id=36756081">URL: https://elibrary.ru/item.asp?id=36756081</a>
+	</div>	<div class='one_source'>
+		Ненашева Л.В. Наименования рукавиц в архангельских говорах // Русский язык в славянской межкультурной коммуникации: сборник научных трудов по итогам  международной научной конференции, посвященной 75-летию со дня рождения док. филол. наук, профессора Войловой К.А. – М.: ИИУ МГОУ, 2018. С. 242–246. <a href="https://elibrary.ru/item.asp?id=35148127">URL: https://elibrary.ru/item.asp?id=35148127</a>
+	</div>	
+		<div class='one_source'>
+		Ненашева Л.В. Названия украшений в Архангельских говорах // Рациональное и эмоциональное в русском языке: сборник трудов Международной научной конференции, посвященной 85-летию д.ф.н., профессора П.А. Леканта. – М., ИИУ МГОУ, 2017. – С. 27–231.<a href="https://elibrary.ru/item.asp?id=32627618">URL: https://elibrary.ru/item.asp?id=32627618</a>
+	</div>
+		<div class='one_source'>
+		Ненашева Л.В. Названия платков и шалей в говорах Архангельской области // Проблемы изучения и реставрации головных уборов традиционных костюмов народов России: материалы международной научно-практической конференции. – Архангельск: КИРА, 2017.
+	</div>
+		<div class='one_source'>
+		Ненашева Л.В. Названия женской одежды в говорах Архангельской области // Вестник САФУ. – № 1 – 2017. – Архангельск: ИД имени В.Н. Булатова. – С. 115–123. DOI: 10.17238/issn2227-6564.2017.1.115. <a href="https://elibrary.ru/item.asp?id=28341290">URL: https://elibrary.ru/item.asp?id=28341290</a>
+	</div>
+	<div class='one_source'>
+		Ненашева Л.В. Общее название одежды в архангельских говорах // Рациональное и эмоциональное в русском языке: сборник трудов Международной научной конференции. Редколлегия: П.А. Лекант (отв. ред.). – М., ИИУ МГОУ, 2016. – С. 152–155. <a href="https://elibrary.ru/item.asp?id=29708750">URL: https://elibrary.ru/item.asp?id=29708750</a>
+	</div>
+		<div class='one_source'>
+		Ненашева Л.В. Названия головных уборов в говорах Архангельской области // Русский язык: история, диалекты, современность (вып. XV). Сборник научных статей по материалам докладов и сообщений конференции. – М.: МГОУ, 2016. – С. 41–46. <a href="https:// elibrary.ru/item.asp?id=27309640">URL: https://elibrary.ru/item.asp?id=27309640</a>
+	</div>
+		<div class='one_source'>
+		Ненашева Л.В. Название сарафана в говорах Архангельской области // Рациональное и эмоциональное в русском языке: сборник трудов Международной научной конференции. – М., ИИУ МГОУ, 2015. – С. 112–116. <a href="https:// elibrary.ru/item.asp?id=25336079">URL: https://elibrary.ru/item.asp?id=25336079</a>
+	</div>
+</div>
+
+</div>
+
+<div class="carousel_container">
+<div class="carousel">
+  <ol class="carousel__viewport" id="carousel__viewport">
+    
+  </ol>
+</div>
+</div>
+
+</div>
+
+
+<div class='footer'>
+
+	<p>Исследование выполнено за счёт средств гранта Российского научного фонда № 23-28-01380, «Тематический словарь архангельских говоров с электронной поддержкой» <br/><a href='https://rscf.ru/project/23-28-01380/'>https://rscf.ru/project/23-28-01380/</a></p>
+	<ul class="dict_link_nav">
+		<li class='dict_link'><a href='#project'>О проекте</a></li>
+		<li class='dict_link'><a href='#researches'>Публикации</a></li>
+		<li class='dict_link'><a href='#top'>↑</a></li>
+	</ul>
+	
+</div>
+<script defer src="{% static 'js/jquery-3.7.1.min.js' %}"></script>
+<script>
+	const slidesData = [
+    {
+        id: "carousel__slide1",
+        src: "{% static 'images/gallery_1.webp' %}",
+        alt: "Миронова Г.Н. Пинежский район, деревня Айнова, 1977 год. Наблюдник.",
+        title: "Миронова Г.Н. Пинежский район, деревня Айнова, 1977 год. Наблюдник.",
+        prev: "#carousel__slide36",
+        next: "#carousel__slide2"
+    },
+    {
+        id: "carousel__slide2",
+        src: "{% static 'images/gallery_2.webp' %}",
+        alt: "Бородина Л., Дедова В., Огаркова Н., Павлова Н., Сабурова Л., Ярошенко Т. Плесецкий район, Тарасовский сельсовет, 1983 год. Ушаты",
+        title: "Бородина Л., Дедова В., Огаркова Н., Павлова Н., Сабурова Л., Ярошенко Т. Плесецкий район, Тарасовский сельсовет, 1983 год. Ушаты",
+        prev: "#carousel__slide1",
+        next: "#carousel__slide3"
+    },
+    {
+        id: "carousel__slide3",
+        src: "{% static 'images/gallery_3.webp' %}",
+        alt: "Седакова Е., Смирнова Е., Тлехуч Е., Авдеева И., Смолярж И. Каргопольский район, село Лёкшмозеро, 1985 год",
+        title: "Седакова Е., Смирнова Е., Тлехуч Е., Авдеева И., Смолярж И. Каргопольский район, село Лёкшмозеро, 1985 год",
+        prev: "#carousel__slide2",
+        next: "#carousel__slide4"
+    },
+    {
+        id: "carousel__slide4",
+        src: "{% static 'images/gallery_4.webp' %}",
+        alt: "Бородина Л., Дедова В., Огаркова Н., Павлова Н., Сабурова Л., Ярошенко Т. Плесецкий район, Тарасовский сельсовет, 1983 год. Огаркова Евдокия Степановна",
+        title: "Бородина Л., Дедова В., Огаркова Н., Павлова Н., Сабурова Л., Ярошенко Т. Плесецкий район, Тарасовский сельсовет, 1983 год. Огаркова Евдокия Степановна",
+        prev: "#carousel__slide3",
+        next: "#carousel__slide5"
+    },
+    {
+        id: "carousel__slide5",
+        src: "{% static 'images/gallery_5.webp' %}",
+        alt: "Пономарёва С., Яковлева Е., Ляпшина М. Плесецкий район, село Вершинино. Дом Марии Глущевской",
+        title: "Пономарёва С., Яковлева Е., Ляпшина М. Плесецкий район, село Вершинино. Дом Марии Глущевской",
+        prev: "#carousel__slide4",
+        next: "#carousel__slide6"
+    },
+    {
+        id: "carousel__slide6",
+        src: "{% static 'images/gallery_6.webp' %}",
+        alt: "Пинежский район, село Веркола",
+        title: "Пинежский район, село Веркола",
+        prev: "#carousel__slide5",
+        next: "#carousel__slide7"
+    },
+    {
+        id: "carousel__slide7",
+        src: "{% static 'images/gallery_7.jpg' %}",
+        alt: "Деревянный дом",
+        title: "Деревянный дом",
+        prev: "#carousel__slide6",
+        next: "#carousel__slide8"
+    },
+     {
+        id: "carousel__slide8",
+        src: "{% static 'images/gallery_8.jpg' %}",
+        alt: "Конёк на крыше",
+        title: "Конёк на крыше",
+        prev: "#carousel__slide7",
+        next: "#carousel__slide9"
+    },
+     {
+        id: "carousel__slide9",
+        src: "{% static 'images/gallery_9.jpg' %}",
+        alt: "Элемент наличника",
+        title: "Элемент наличника",
+        prev: "#carousel__slide8",
+        next: "#carousel__slide10"
+    },
+     {
+        id: "carousel__slide10",
+        src: "{% static 'images/gallery_10.jpg' %}",
+        alt: "Элемент наличника",
+        title: "Элемент наличника",
+        prev: "#carousel__slide9",
+        next: "#carousel__slide11"
+    },
+     {
+        id: "carousel__slide11",
+        src: "{% static 'images/gallery_11.jpg' %}",
+        alt: "Калитки в печи",
+        title: "Калитки в печи",
+        prev: "#carousel__slide10",
+        next: "#carousel__slide12"
+    },
+     {
+        id: "carousel__slide12",
+        src: "{% static 'images/gallery_12.jpg' %}",
+        alt: "Гриб",
+        title: "Гриб",
+        prev: "#carousel__slide11",
+        next: "#carousel__slide13"
+    },
+     {
+        id: "carousel__slide13",
+        src: "{% static 'images/gallery_13.jpg' %}",
+        alt: "Конёк на крыше",
+        title: "Конёк на крыше",
+        prev: "#carousel__slide12",
+        next: "#carousel__slide14"
+    },
+     {
+        id: "carousel__slide14",
+        src: "{% static 'images/gallery_14.jpg' %}",
+        alt: "Двужирный дом",
+        title: "Двужирный дом",
+        prev: "#carousel__slide13",
+        next: "#carousel__slide15"
+    },
+     {
+        id: "carousel__slide15",
+        src: "{% static 'images/gallery_15.jpg' %}",
+        alt: "Дом-двор",
+        title: "Дом-двор",
+        prev: "#carousel__slide14",
+        next: "#carousel__slide16"
+    },
+     {
+        id: "carousel__slide16",
+        src: "{% static 'images/gallery_16.jpg' %}",
+        alt: "Дом-двор",
+        title: "Дом-двор",
+        prev: "#carousel__slide15",
+        next: "#carousel__slide17"
+    },
+     {
+        id: "carousel__slide17",
+        src: "{% static 'images/gallery_17.jpg' %}",
+        alt: "Дом-двор",
+        title: "Дом-двор",
+        prev: "#carousel__slide16",
+        next: "#carousel__slide18"
+    },
+     {
+        id: "carousel__slide18",
+        src: "{% static 'images/gallery_18.jpg' %}",
+        alt: "Окна, ставни, наличники",
+        title: "Окна, ставни, наличники",
+        prev: "#carousel__slide17",
+        next: "#carousel__slide19"
+    },
+     {
+        id: "carousel__slide19",
+        src: "{% static 'images/gallery_19.jpg' %}",
+        alt: "Окна, ставни, наличники",
+        title: "Окна, ставни, наличники",
+        prev: "#carousel__slide18",
+        next: "#carousel__slide20"
+    },
+     {
+        id: "carousel__slide20",
+        src: "{% static 'images/gallery_20.jpg' %}",
+        alt: "Взвоз (взъезд)",
+        title: "Взвоз (взъезд)",
+        prev: "#carousel__slide19",
+        next: "#carousel__slide21"
+    },
+     {
+        id: "carousel__slide21",
+        src: "{% static 'images/gallery_21.jpg' %}",
+        alt: "Взвоз (взъезд)",
+        title: "Взвоз (взъезд)",
+        prev: "#carousel__slide20",
+        next: "#carousel__slide22"
+    },
+     {
+        id: "carousel__slide22",
+        src: "{% static 'images/gallery_22.jpg' %}",
+        alt: "Гумно с овином",
+        title: "Гумно с овином",
+        prev: "#carousel__slide21",
+        next: "#carousel__slide23"
+    },
+     {
+        id: "carousel__slide23",
+        src: "{% static 'images/gallery_23.jpg' %}",
+        alt: "Гумно с овином",
+        title: "Гумно с овином",
+        prev: "#carousel__slide22",
+        next: "#carousel__slide24"
+    },
+     {
+        id: "carousel__slide24",
+        src: "{% static 'images/gallery_24.jpg' %}",
+        alt: "Печь",
+        title: "Печь",
+        prev: "#carousel__slide23",
+        next: "#carousel__slide25"
+    },
+     {
+        id: "carousel__slide25",
+        src: "{% static 'images/gallery_25.jpg' %}",
+        alt: "Печь",
+        title: "Печь",
+        prev: "#carousel__slide24",
+        next: "#carousel__slide26"
+    },
+     {
+        id: "carousel__slide26",
+        src: "{% static 'images/gallery_26.jpg' %}",
+        alt: "Печь",
+        title: "Печь",
+        prev: "#carousel__slide25",
+        next: "#carousel__slide27"
+    },
+     {
+        id: "carousel__slide27",
+        src: "{% static 'images/gallery_27.jpg' %}",
+        alt: "Шолныша (солныша)",
+        title: "Шолныша (солныша)",
+        prev: "#carousel__slide26",
+        next: "#carousel__slide28"
+    },
+     {
+        id: "carousel__slide28",
+        src: "{% static 'images/gallery_28.jpg' %}",
+        alt: "Грядка (воронец)",
+        title: "Грядка (воронец)",
+        prev: "#carousel__slide27",
+        next: "#carousel__slide29"
+    },
+     {
+        id: "carousel__slide29",
+        src: "{% static 'images/gallery_29.jpg' %}",
+        alt: "Очеп и зыбка",
+        title: "Очеп и зыбка",
+        prev: "#carousel__slide28",
+        next: "#carousel__slide30"
+    },
+     {
+        id: "carousel__slide30",
+        src: "{% static 'images/gallery_30.jpg' %}",
+        alt: "Красный угол",
+        title: "Красный угол",
+        prev: "#carousel__slide29",
+        next: "#carousel__slide31"
+    },
+     {
+        id: "carousel__slide31",
+        src: "{% static 'images/gallery_31.jpg' %}",
+        alt: "Горница",
+        title: "Горница",
+        prev: "#carousel__slide30",
+        next: "#carousel__slide32"
+    },
+     {
+        id: "carousel__slide32",
+        src: "{% static 'images/gallery_32.jpg' %}",
+        alt: "Косая изгородь",
+        title: "Косая изгородь",
+        prev: "#carousel__slide31",
+        next: "#carousel__slide33"
+    },
+     {
+        id: "carousel__slide33",
+        src: "{% static 'images/gallery_33.jpg' %}",
+        alt: "Изгородь",
+        title: "Изгородь",
+        prev: "#carousel__slide32",
+        next: "#carousel__slide34"
+    },
+     {
+        id: "carousel__slide34",
+        src: "{% static 'images/gallery_34.jpg' %}",
+        alt: "Колодец-журавль",
+        title: "Колодец-журавль",
+        prev: "#carousel__slide33",
+        next: "#carousel__slide35"
+    },
+     {
+        id: "carousel__slide35",
+        src: "{% static 'images/gallery_35.jpg' %}",
+        alt: "Клеть",
+        title: "Клеть",
+        prev: "#carousel__slide34",
+        next: "#carousel__slide36"
+    },
+     {
+        id: "carousel__slide36",
+        src: "{% static 'images/gallery_36.jpg' %}",
+        alt: "Поветь",
+        title: "Поветь",
+        prev: "#carousel__slide35",
+        next: "#carousel__slide1"
+    }
+];
+
+// Функция для создания слайдов
+function createSlides(slidesData) {
+    const carouselViewport = document.getElementById("carousel__viewport");
+
+    slidesData.forEach(slide => {
+        const slideElement = document.createElement("li");
+        slideElement.id = slide.id;
+        slideElement.tabIndex = "0";
+        slideElement.classList.add("carousel__slide");
+
+        const snapperElement = document.createElement("div");
+        snapperElement.classList.add("carousel__snapper");
+
+        const imgElement = document.createElement("img");
+        imgElement.src = slide.src;
+        imgElement.height = "300";
+        imgElement.alt = slide.alt;
+        imgElement.title = slide.title;
+
+        snapperElement.appendChild(imgElement);
+
+        const prevLink = document.createElement("a");
+        prevLink.href = slide.prev;
+        prevLink.classList.add("carousel__prev");
+        prevLink.textContent = "Go to previous slide";
+
+        const nextLink = document.createElement("a");
+        nextLink.href = slide.next;
+        nextLink.classList.add("carousel__next");
+        nextLink.textContent = "Go to next slide";
+
+        slideElement.appendChild(snapperElement);
+        slideElement.appendChild(prevLink);
+        slideElement.appendChild(nextLink);
+
+        carouselViewport.appendChild(slideElement);
+    });
+}
+
+function toggleBlock() {
+        $('.sources_cut').toggleClass('collapsed');
+        if ($('.sources_cut').hasClass('collapsed')) {
+            $('#toggleButton').text('Развернуть');
+        } else {
+            $('#toggleButton').text('Свернуть');
+        }
+    }
+
+// Создание слайдов при загрузке страницы
+document.addEventListener("DOMContentLoaded", () => {
+    createSlides(slidesData);
+
+});
+
+</script>
+</body>

@@ -1,0 +1,208 @@
+{% load static %}
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	<title>Электронный тематический словарь архангельских говоров</title>
+	<meta name="keywords" content="" />
+	<meta name="description" content="В электронном словаре архангельских говоров на данный момент представлена диалектная лексика, относящаяся к тематическим группам «Одежда, обувь, головные уборы, украшения, ткани», «Жилые и хозяйственные постройки и их части», «Традиционные северные блюда и напитки и способы их приготовления». 
+
+Слова расположены в алфавитном порядке, у каждого слова указана тематическая группа." />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta charset="UTF-8">
+	<link rel="icon" href="{% static 'images/favicon.ico' %}">
+	<link href="{% static 'css/style_dict.css' %}" rel="stylesheet" type="text/css" media="screen" />
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Bitter&display=swap" rel="stylesheet"> 
+	<script defer src="{% static 'js/jquery-3.7.1.min.js' %}"></script>
+	<script defer src="{% static 'js/dictionary.js' %}"></script>
+
+	  <style>
+       
+    </style>
+</head>
+<body>
+<div class="header">
+<h1>Электронный словарь архангельских говоров</h1>
+<a href="{% url 'index' %}" class="back">&rarr; Главная страница</a>
+<a href="{% url 'map' %}" class="back">&rarr; Лексический атлас</a>
+</div>
+
+
+<div id='container'>
+<p class="prolog">В электронном словаре архангельских говоров на&nbsp;данный момент представлена диалектная лексика, относящаяся к&nbsp;тематическим группам:
+    <ul class='prolog_list'>
+<li>«Одежда, обувь, головные уборы, украшения, ткани»,</li>
+<li>«Жилые и хозяйственные постройки и их части»,</li>
+<li>«Традиционные северные блюда и напитки и способы их приготовления».</li> 
+</ul></p>
+<p class="prolog">Слова расположены в&nbsp;алфавитном порядке, у&nbsp;каждого слова указана тематическая группа.</p>
+<p class="prolog">Для поиска конкретного слова введите его в строку поиска (поддерживается только кириллица). Кнопка «Сортировка» открывает фильтры, которые позволяют отсортировать слова в прямом или обратном алфавитном порядке или по тематическим группам.</p>
+<p class="prolog">Инструкция пропадет, если вы нажмете на кнопку «Искать». Если инструкция снова понадобится, нажмите на кнопку «Очистить поиск», обновите страницу или откройте страницу в новой вкладке.</p>
+<p class="prolog">Загрузка страницы может занять несколько секунд.</p>
+<div class="word_form filters">
+    <label for="word">Слово для поиска:&nbsp;</label>
+    <input type="text" maxlength="28" id="word" name="word">
+    <label for="word" id="warning" style="display: none;">Только кириллица!</label>
+	<br>
+    <button class="filter-button filter">Искать</button>
+	<button class="filter-button" onclick="removeParams()">Очистить поиск</button>
+
+	<button class="filter-button" id="filters-show">Сортировка</button>
+</div>
+<!-- Кнопки фильтрации по категориям -->
+
+<div class="filters-container">
+
+	<div class="filters" id="order-filters">
+	<button class="filter-button order-button filter active" data-order="0">А-Я</button>
+	<button class="filter-button order-button filter" data-order="1">Я-А</button>
+	<button class="filter-button order-button filter" data-order="2">Тематическая группа &uarr;</button>
+	<button class="filter-button order-button filter" data-order="3">Тематическая группа &darr;</button>
+	</div>
+
+
+</div>
+
+
+<!-- Выпадающий список для фильтров - тематические группы -->
+<div class="selected-items" id="selected-items-subcategory">
+        <!-- Выбранные элементы будут отображаться здесь -->
+    </div>
+ <div class="dropdown">
+        <input type="text" class="filter-input" id="filter-input-subcategory" placeholder="Тематическая группа (выбор варианта)" oninput="filterOptions()" onfocus="showDropdown('-subcategory')">
+        <div class="dropdown-content" id="dropdown-content-subcategory">
+  
+    </div>
+    </div>
+
+  
+    <!-- Выпадающий список для фильтров - районы -->
+    <div class="selected-items" id="selected-items-region">
+        <!-- Выбранные элементы будут отображаться здесь -->
+    </div>
+    <div class="dropdown">
+        <input type="text" class="filter-input" id="filter-input-region" placeholder="Район или округ (выбор варианта)" oninput="filterOptions('-region')" onfocus="showDropdown('-region')">
+        <div class="dropdown-content" id="dropdown-content-region">
+            <div class="optgroup-label">Район (округ)</div>
+            
+        </div>  
+    </div>
+
+    <!-- Выпадающий список для фильтров - части речи -->
+    <div class="selected-items" id="selected-items-pos">
+        <!-- Выбранные элементы будут отображаться здесь -->
+    </div>
+    <div class="dropdown">
+        <input type="text" class="filter-input" id="filter-input-pos" placeholder="Часть речи (выбор варианта)" oninput="filterOptions('-pos')" onfocus="showDropdown('-pos')">
+        <div class="dropdown-content" id="dropdown-content-pos">
+            <div class="optgroup-label">Часть речи</div>
+
+        </div>
+    </div>
+
+    <div id='words'></div>
+
+
+    <script>
+        const selectedItemsSubcategory = new Set();
+        const selectedItemsRegion = new Set();
+        const selectedItemsPos = new Set();
+
+        function showDropdown(label) {
+            labels = ['-subcategory', '-region', '-pos']
+            labels.forEach(element => hideDropdown(element));
+
+            const dropdownContent = document.getElementById('dropdown-content' + label);
+            dropdownContent.style.display = 'block';
+        }
+
+        function hideDropdown(label) {
+            const dropdownContents = document.getElementById('dropdown-content' + label);
+            dropdownContents.style.display = 'none';
+        }
+
+        function filterOptions(label) {
+            const filterInput = document.getElementById('filter-input' + label);
+            const filterValue = filterInput.value.toLowerCase();
+            const dropdownContent = document.getElementById('dropdown-content' + label);
+            const options = dropdownContent.getElementsByClassName('option');
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                const optionText = option.textContent.toLowerCase();
+                if (optionText.startsWith(filterValue)) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
+            }
+        }
+
+        function selectOption(item, label) {
+            const filterInput = document.getElementById('filter-input' + label);
+            let selectedItems;
+            let selectedItemsContainer;
+
+            switch (label) {
+                case '-subcategory':
+                    selectedItems = selectedItemsSubcategory;
+                    selectedItemsContainer = document.getElementById('selected-items-subcategory');
+                    break;
+                case '-region':
+                    selectedItems = selectedItemsRegion;
+                    selectedItemsContainer = document.getElementById('selected-items-region');
+                    break;
+                case '-pos':
+                    selectedItems = selectedItemsPos;
+                    selectedItemsContainer = document.getElementById('selected-items-pos');
+                    break;
+            }
+
+            if (selectedItems.has(item)) {
+                selectedItems.delete(item);
+                removeSelectedItem(item, selectedItemsContainer);
+            } else {
+                selectedItems.add(item);
+                addSelectedItem(item, selectedItemsContainer);
+            }
+            filterInput.value = ''; // Сброс выбранного значения
+
+        }
+
+        function addSelectedItem(item, container) {
+            const itemElement = document.createElement('div');
+            itemElement.classList.add('selected-item');
+            itemElement.setAttribute('data', item);
+            itemElement.innerHTML = `${item} <span class='remove' onclick="removeSelectedItem('${item}', this.parentElement.parentElement)">×</span>`;
+            container.appendChild(itemElement);
+            filterWords(getFilters(false));
+        }
+
+        function removeSelectedItem(item, container) {
+            const itemElements = container.querySelectorAll('.selected-item');
+            itemElements.forEach(element => {
+                if (element.textContent.includes(item)) {
+                    element.remove();
+                }
+            });
+            filterWords(getFilters(false));
+        }
+
+        document.addEventListener('click', function(event) {
+            labels = ['-subcategory', '-region', '-pos']
+            labels.forEach(element => {
+            if (!event.target.matches('#filter-input' + element) && document.getElementById('dropdown-content' + element)) {
+                hideDropdown(element);
+            }
+            });
+        });
+    </script>
+
+{% csrf_token %}
+</body>
+
+	
+
+		
