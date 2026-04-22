@@ -1,0 +1,190 @@
+.map {
+	width: 1200px;
+	margin: 10px 250px;
+    position: relative;
+    overflow: visible; 
+	z-index: 1;
+}
+
+svg {
+	width: 100%;
+}
+
+path {
+	cursor: pointer;
+	stroke-opacity: 1;
+	stroke-linejoin: round;
+	stroke-linecap: round;
+	stroke-width: 2px;
+	stroke: #002C5B;
+	fill: #ECEFF6;
+	display: inline;
+
+	shape-rendering: geometricPrecision;
+	text-rendering: geometricPrecision;
+	image-rendering: optimizeQuality;
+	fill-rule: evenodd;
+	clip-rule: evenodd;
+} 	
+path:hover {
+	fill: #002C5B;
+}
+
+
+.marker {
+            position: absolute;
+			pointer-events: none;
+            background-color: #ECEFF6;
+            border: 2px solid #002C5B;
+            border-radius: 10%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            margin: 2px;
+			box-sizing: border-box;
+        }
+
+        .dropdown_region {
+            position: absolute;
+            background-color: white;
+            border: 2px solid #002C5B;
+			border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 44, 91, 0.2);
+			max-width: 350px;
+			max-height: 400px;
+			display: none;
+			pointer-events: none;
+        }
+        .dropdown_region.visible {
+			z-index: 10000 !important; /* Очень высокий, чтобы был поверх всего */
+   			display: block;
+    	}
+        .dropdown_region h3 {
+            margin: 0 0 10px;
+        }
+        .dropdown_region ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .dropdown_region ul li {
+            margin: 5px 0;
+        }
+        .prolog {
+        	  color: #002C5B;
+        }
+
+
+
+
+.word_form {
+	width: 700px;
+  	height: 450px;
+  	position: absolute;
+  	top: 400px;  /* 325 */
+  	left: 950px; /* 690 */
+  	background: #ECEFF6;
+  	border: 1.5px solid #002C5B;
+  	border-radius: 10px;
+  	padding: 20px;
+  	box-sizing: border-box;
+	z-index: 100;
+}
+
+
+.header {
+	width: 500px; /* 350 */
+	position: absolute;
+	top: 30px;
+	left: 30px;
+	background: #ECEFF6;
+	color: #002C5B;
+	display: flex;
+	flex-direction: column;
+	flex-wrap: nowrap;
+}
+.hrefs {
+	width: 100%;
+	padding: 0 20px;
+	box-sizing: border-box;
+	display: flex;
+	justify-content: space-between;
+	flex-direction: column;
+	flex-wrap: nowrap;
+}
+
+.hrefs a {
+	margin: 10px 0 0 0;
+	color: #002C5B;
+}
+
+
+
+
+/* кнопки */
+
+#warning {
+	background: hsl(10, 90%, 65%);
+	border-radius: 7px;
+	padding: 10px;
+	margin: 0 10px;
+}
+
+.filter-button {
+  background-color: #eceff6;
+  color: #002c5b;
+  margin: 3px;
+  padding: 7px;
+  border: 2px solid #002C5B;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.filter-button.active, #filters-show.open {
+    background-color: #002c5b;
+    color: #eceff6;
+}
+
+
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f9f9f9;
+  min-width: 200px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 101;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.selected-items {
+	min-height: 0px;
+  margin: 20px 0 10px 0;
+}
+.selected-item {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 5px;
+	border: 2px solid #002C5B;
+	border-radius: 10px;
+  background-color: #eceff6;
+  color: #002C5B;
+}
+.selected-item.remove {
+  cursor: pointer;
+  color: red;
+  margin-left: 5px;
+}
+.selected-item.number {
+  margin: 0 5px;
+}
+.option {
+	cursor: pointer;
+	padding: 10px 40px;
+	margin: 5px 0;
+	box-sizing: content-box;
+}
+.option:hover {
+	background-color: #002C5B;
+	color: #ECEFF6;
+}

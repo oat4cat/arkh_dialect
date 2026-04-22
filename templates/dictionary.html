@@ -18,6 +18,7 @@
 	<link href="https://fonts.googleapis.com/css2?family=Bitter&display=swap" rel="stylesheet"> 
 	<script defer src="{% static 'js/jquery-3.7.1.min.js' %}"></script>
 	<script defer src="{% static 'js/dictionary.js' %}"></script>
+    <script defer src="{% static 'js/scripts.js' %}"></script>
 
 	  <style>
        
@@ -26,8 +27,10 @@
 <body>
 <div class="header">
 <h1>Электронный словарь архангельских говоров</h1>
-<a href="{% url 'index' %}" class="back">&rarr; Главная страница</a>
-<a href="{% url 'map' %}" class="back">&rarr; Лексический атлас</a>
+<div class="hrefs">
+<a href="{% url 'index' %}">&rarr; Главная страница</a>
+<a href="{% url 'map' %}">&rarr; Лексический атлас</a>
+</div>
 </div>
 
 
@@ -72,7 +75,7 @@
         <!-- Выбранные элементы будут отображаться здесь -->
     </div>
  <div class="dropdown">
-        <input type="text" class="filter-input" id="filter-input-subcategory" placeholder="Тематическая группа (выбор варианта)" oninput="filterOptions()" onfocus="showDropdown('-subcategory')">
+        <input type="text" class="filter-input" id="filter-input-subcategory" placeholder="Тематическая группа (выбор варианта)" readonly="True" onfocus="showDropdown('-subcategory')">
         <div class="dropdown-content" id="dropdown-content-subcategory">
   
     </div>
@@ -84,7 +87,7 @@
         <!-- Выбранные элементы будут отображаться здесь -->
     </div>
     <div class="dropdown">
-        <input type="text" class="filter-input" id="filter-input-region" placeholder="Район или округ (выбор варианта)" oninput="filterOptions('-region')" onfocus="showDropdown('-region')">
+        <input type="text" class="filter-input" id="filter-input-region" placeholder="Район или округ (выбор варианта)" readonly="True" onfocus="showDropdown('-region')">
         <div class="dropdown-content" id="dropdown-content-region">
             <div class="optgroup-label">Район (округ)</div>
             
@@ -96,7 +99,7 @@
         <!-- Выбранные элементы будут отображаться здесь -->
     </div>
     <div class="dropdown">
-        <input type="text" class="filter-input" id="filter-input-pos" placeholder="Часть речи (выбор варианта)" oninput="filterOptions('-pos')" onfocus="showDropdown('-pos')">
+        <input type="text" class="filter-input" id="filter-input-pos" placeholder="Часть речи (выбор варианта)" readonly="True" onfocus="showDropdown('-pos')">
         <div class="dropdown-content" id="dropdown-content-pos">
             <div class="optgroup-label">Часть речи</div>
 
