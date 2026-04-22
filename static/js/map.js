@@ -1,9 +1,35 @@
 const found_items = new Set();
 const selectedItems = new Set();
 let regions_map = {}
+let markers = [];
 
+const regionCenters = {
+    'velsk': { x: 430.050, y: 802.705 },
+    'verhnetoem': { x: 661.187, y: 643.540 },
+    'vileg': { x: 842.209, y: 824.457 },
+    'vinogr': { x: 517.969, y: 575.402 },
+    'kargop': { x: 200.585, y: 786.200 },
+    //'kenozero': { x: 380, y: 290 },
+    'konosh': { x: 295.121, y: 850.691 },
+    'kotlas': { x: 744.699, y: 810.780 },
+    'krasnob': { x: 724.85, y: 734.88 },
+    'lensk': { x: 871.138, y: 702.714 },
+    'leshuk': { x: 785.527, y: 277.093 },
+    'mezen': { x: 609.258, y: 123.991 },
+    'nyandom': { x: 319.071, y: 718.251 },
+    'nao': { x: 1247.166, y: -258.140 },
+    'onezh': { x: 140.240, y: 455.776 },
+    'pinezh': { x: 573.765, y: 385.540 },
+    'plesec': { x: 269.293, y: 607.585 },
+    'primor': { x: 261.436, y: 285.130 },
+    'ustian': { x: 555.433, y: 814.22 },
+    'holm': { x: 412.678, y: 428.484 },
+    'shenk': { x: 455.979, y: 691.742 }
+};
 
-
+/**
+ * Скрывает первоначальную инструкцию, ищет выбранное слово
+ */
 function searchItems() {
     $('.prolog').hide();
     const searchTerm = document.getElementById('word').value;
@@ -116,32 +142,6 @@ document.addEventListener('click', function (event) {
         hideDropdown('-map');
     }
 });
-
-let markers = [];
-
-const regionCenters = {
-    'velsk': { x: 430.050, y: 802.705 },
-    'verhnetoem': { x: 661.187, y: 643.540 },
-    'vileg': { x: 842.209, y: 824.457 },
-    'vinogr': { x: 517.969, y: 575.402 },
-    'kargop': { x: 200.585, y: 786.200 },
-    //'kenozero': { x: 380, y: 290 },
-    'konosh': { x: 295.121, y: 850.691 },
-    'kotlas': { x: 744.699, y: 810.780 },
-    'krasnob': { x: 724.85, y: 734.88 },
-    'lensk': { x: 871.138, y: 702.714 },
-    'leshuk': { x: 785.527, y: 277.093 },
-    'mezen': { x: 609.258, y: 123.991 },
-    'nyandom': { x: 319.071, y: 718.251 },
-    'nao': { x: 1247.166, y: -258.140 },
-    'onezh': { x: 140.240, y: 455.776 },
-    'pinezh': { x: 573.765, y: 385.540 },
-    'plesec': { x: 269.293, y: 607.585 },
-    'primor': { x: 261.436, y: 285.130 },
-    'ustian': { x: 555.433, y: 814.22 },
-    'holm': { x: 412.678, y: 428.484 },
-    'shenk': { x: 455.979, y: 691.742 }
-};
 
 function placeMarkers(data) {
     const map = document.getElementById('map');

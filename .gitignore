@@ -34,6 +34,7 @@ db.sqlite3-journal
 /media
 /staticfiles
 /static/images
+/static/js/jquery-3.7.1.min.js
 /utils
 
 # IDE

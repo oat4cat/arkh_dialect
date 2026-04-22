@@ -23,7 +23,9 @@ $.ajaxSetup({
 });
 
 
-/* Загружаем простые фильтры (без вложенности) */
+/**
+ * Загрузка фильтров частей речи, районов 
+ */
 function loadSimpleFilter(apiUrl, containerId, selectedContainerId) {
     $.ajax({
         url: apiUrl,
@@ -34,7 +36,7 @@ function loadSimpleFilter(apiUrl, containerId, selectedContainerId) {
 
             data.forEach(item => {
                 const value = item.name || item; // name для регионов, строка для pos
-                const label = item.name || item;
+                const label = item.name || item; // ??? тут надо нормально сделать
 
                 const btn = $(`<button class="filter" data="${value}">${label}</button>`);
 
@@ -66,7 +68,9 @@ function loadSimpleFilter(apiUrl, containerId, selectedContainerId) {
     });
 }
 
-/* Загружаем категории с подкатегориями */
+/**
+ * Загрузка фильтров категорий и подкатегорий
+ */
 function loadCategories() {
     $.ajax({
         url: '/api/categories/',
@@ -124,29 +128,51 @@ function loadCategories() {
     });
 }
 
-/* Показываем выбранные теги */
+/**
+ * Добавление фильтра в список выбранных
+ *
+ * @param {string} label - название тега для пользователя
+ * @param {string} value - значение тега для поиска по базе 
+ */
 function createSelectedTag(label, value) {
     const tag = document.createElement('div');
     tag.className = 'selected-item';
     tag.setAttribute('data', value);
     tag.innerHTML = `
         ${label}
-        <span class="remove" onclick="removeFilter(this, '${value}')">×</span>
+        <span class="remove" onclick="removeFilter(this)">×</span>
     `;
     return tag;
 }
 
-/* Удаляем фильтр из списка выбранных */
-function removeFilter(element, value) {
-    // Находим и удаляем кнопку фильтра в дропдауне
+
+/**
+ * Удаление фильтр из списка выбранных
+ *
+ * @param {Object} element - объект span - крестик, потомок выбранного тега. 
+ */
+function removeFilter(element) {
+    // Находим и чистим стили кнопки фильтра в дропдауне
+    filter_div = $(element).parent()
+    value = filter_div.attr('data');
     $(`.filter[data="${value}"]`).removeClass('active');
 
     // Удаляем тег
-    $(element).parent().remove();
+    filter_div.remove();
     filterWords(getFilters(false));
 }
 
 /* 3. Сбор текущих параметров фильтрации */
+/**
+ * Получает список выбранных фильтров и передаёт их в функцию фильтрации.
+ * По умолчанию фильтрует с первой страницы
+ *
+ * @param {int} page_chosen - Ушёл ли пользователь с первой страницы, для пагинации.
+ * @param {int} page_num - На какой странице находится пользователь, для пагинации.
+ * 
+ * @returns {dict} выбранные фильтры - слово, категория, район, часть речи,
+ * текущая страница, сортировка
+ */
 function getFilters(page_chosen, page_num = 1) {
     $('.prolog, .prolog_list').hide();
 
@@ -167,6 +193,13 @@ function getFilters(page_chosen, page_num = 1) {
 }
 
 /* 4. Запрос к Django API */
+/**
+ * Выполняет AJAX-запрос к серверу для поиска слов и обновления списка результатов.
+ *
+ * @param {Object} filters - Объект с параметрами фильтрации.
+ * 
+ * @returns {void}
+ */
 function filterWords(filters) {
     $.ajax({
         url: '/api/search/',
@@ -185,21 +218,30 @@ function filterWords(filters) {
 }
 
 /* 5. Отрисовка результатов */
-function createWordArticle(wordData) {
+/**
+ * Формирует словарную статью
+ *
+ * @param {Object} word - Структура слова
+ * @param {string} word.meaning - Значение слова
+ * @param {string[]} word.examples - Примеры употребления с районами
+ * 
+ * @returns {Object} DOM-структура - словарная статья
+ */
+function createWordArticle(word) {
     const article = document.createElement('div');
     article.className = 'word';
 
-    const header = createWordHeader(wordData);
+    const header = createWordHeader(word);
     article.appendChild(header);
 
-    if (wordData.meaning) {
+    if (word.meaning) {
         const meaning = document.createElement('div');
         meaning.className = 'word-meaning';
-        meaning.innerHTML = escapeHtml(wordData.meaning);
+        meaning.innerHTML = escapeHtml(word.meaning);
         article.appendChild(meaning);
     }
 
-    wordData.examples.forEach(ex => {
+    word.examples.forEach(ex => {
         const example = document.createElement('div');
         example.className = 'word-example';
         example.innerHTML = escapeHtml(ex.text);
@@ -216,15 +258,24 @@ function createWordArticle(wordData) {
     return article;
 }
 
-function createWordHeader(w) {
+/**
+ * Формирует заголовок словарной статьи
+ *
+ * @param {Object} word - Структура слова
+ * @param {string} word.word - Слово (без ударения).
+ * @param {string} word.accent - Слово с ударением.
+ * @param {string} word.grammatical_features - часть речи слова
+ * @param {string[]} word.subcategories[] - подкатегории слова
+ */
+function createWordHeader(word) {
     const header = document.createElement('div');
     header.className = 'word-header';
 
     const wordDiv = document.createElement('div');
     wordDiv.className = 'word-word';
 
-    const parts = (w.accent || '').trim().split(/\s+/);
-    const mainWord = parts[0] || w.word;
+    const parts = (word.accent || '').trim().split(/\s+/);
+    const mainWord = parts[0] || word.word;
     const subWord = parts.slice(1).join(' ');
 
     const mainSpan = document.createElement('span');
@@ -232,14 +283,14 @@ function createWordHeader(w) {
 
     const subSpan = document.createElement('span');
     subSpan.className = 'word-subword';
-    subSpan.textContent = `${subWord} ${escapeHtml(w.grammatical_features) || ''}`;
+    subSpan.textContent = `${subWord} ${escapeHtml(word.grammatical_features) || ''}`;
 
     wordDiv.appendChild(mainSpan);
     wordDiv.appendChild(subSpan);
 
     const categoryDiv = document.createElement('div');
     categoryDiv.className = 'word-category';
-    categoryDiv.textContent = escapeHtml(w.subcategories.join(', ') || '');
+    categoryDiv.textContent = escapeHtml(word.subcategories.join(', ') || '');
 
     header.appendChild(wordDiv);
     header.appendChild(categoryDiv);
@@ -247,6 +298,15 @@ function createWordHeader(w) {
     return header;
 }
 
+/**
+ * Формирует DOM-элементы словарных статей на основе полученных данных.
+ *
+ * @param {Object[]} words - Массив объектов слов от сервера.
+ * @param {string} words[].word - Слово (без ударения).
+ * @param {string} words[].accent - Слово с ударением.
+ * @param {string} words[].meaning - Значение слова.
+ * @param {Object[]} words[].examples - Массив примеров употребления.
+ */
 function renderResults(words) {
     const container = document.getElementById('words');
     container.innerHTML = '';

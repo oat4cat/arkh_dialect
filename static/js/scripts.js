@@ -71,7 +71,6 @@ const region_en_to_full = {
 
 function escapeHtml(text) {
     if (!text) return '';
-
     // 1. Сначала экранируем всё (превращаем < в &lt;)
     let safe = text
         .replace(/&/g, "&amp;")
