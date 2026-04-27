@@ -8,6 +8,7 @@ class Category(models.Model):
     class Meta:
         managed = False
         db_table = 'Category'
+        verbose_name = "Тематическая категория"
         verbose_name_plural = "Категории"
 
     def __str__(self): return self.name
@@ -21,6 +22,8 @@ class Region(models.Model):
     class Meta:
         managed = False
         db_table = 'Region'
+        verbose_name = "Район (округ)"
+        verbose_name_plural = "Районы"
 
     def __str__(self): return self.name
 
@@ -34,6 +37,8 @@ class Subcategory(models.Model):
         managed = False
         db_table = 'Subcategory'
         unique_together = (('name', 'category'),)
+        verbose_name = "Подкатегория"
+        verbose_name_plural = "Подкатегории"
 
     def __str__(self): return self.name
 
@@ -53,6 +58,8 @@ class Word(models.Model):
     class Meta:
         managed = False
         db_table = 'Word'
+        verbose_name = "Слово"
+        verbose_name_plural = "Слова"
 
     def __str__(self): return self.word
 
@@ -85,6 +92,8 @@ class Text(models.Model):
     class Meta:
         managed = False
         db_table = 'Text'
+        verbose_name = "Пример употребления"
+        verbose_name_plural = "Примеры"
 
     def __str__(self):
         return f"{self.text[:40]}..." if self.text else "Без текста"
@@ -101,22 +110,24 @@ class TextWord(models.Model):
 
 
 class WordHomonyms(models.Model):
-    id = models.AutoField(primary_key=True)
-    word = models.ForeignKey(Word, on_delete=models.CASCADE, db_column='word', related_name='homonyms_from')
+    word = models.ForeignKey(Word, primary_key=True, on_delete=models.CASCADE, db_column='word', related_name='homonyms_from')
     word_2 = models.ForeignKey(Word, on_delete=models.CASCADE, db_column='word_2', related_name='homonyms_to')
 
     class Meta:
         managed = False
         db_table = 'Word_homonyms'
         unique_together = ('word', 'word_2')
+        verbose_name = "Омоним"
+        verbose_name_plural = "Омонимы"
 
 
 class WordSynonyms(models.Model):
-    id = models.AutoField(primary_key=True)
-    word = models.ForeignKey(Word, on_delete=models.CASCADE, db_column='word', related_name='synonyms_from')
+    word = models.ForeignKey(Word, primary_key=True, on_delete=models.CASCADE, db_column='word', related_name='synonyms_from')
     word_2 = models.ForeignKey(Word, on_delete=models.CASCADE, db_column='word_2', related_name='synonyms_to')
 
     class Meta:
         managed = False
         db_table = 'Word_synonyms'
         unique_together = ('word', 'word_2')
+        verbose_name = "Синоним"
+        verbose_name_plural = "Синонимы"
