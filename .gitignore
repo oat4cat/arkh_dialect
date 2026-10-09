@@ -49,3 +49,6 @@ db.sqlite3-journal
 # База данных (ВАЖНО!)
 dialect.db
 todo.md
+
+# конфиг админа
+fixtures/superuser.json
