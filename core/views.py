@@ -10,9 +10,9 @@ from .models import Category, LexicalEntry, Region
 def _meanings(entry):
     """Значения лексемы из связанных Sense."""
     return "; ".join(
-        meaning
-        for meaning in entry.senses.values_list("meaning", flat=True)
-        if meaning
+        sense.meaning
+        for sense in entry.senses.all()
+        if sense.meaning
     )
 
 
@@ -21,9 +21,9 @@ def search_api(request):
     data = json.loads(request.body)
 
     qs = LexicalEntry.objects.prefetch_related(
-        "subcategories",
-        "texts__region",
-        "senses",
+        "senses__texts__region",
+        "senses__subcategories",
+        "lexical_forms",
     )
 
     entry_filter = LexicalEntryFilter(
@@ -42,8 +42,8 @@ def search_api(request):
     order_map = {
         0: "word",
         1: "-word",
-        2: "subcategories__name",
-        3: "-subcategories__name",
+        2: "senses__subcategories__name",
+        3: "-senses__subcategories__name",
     }
     filtered_qs = filtered_qs.order_by(order_map.get(order, "word")).distinct()
 
@@ -55,19 +55,30 @@ def search_api(request):
     for entry in page_obj:
         examples = []
         region_names = set()
+        seen_text_ids = set()
+        subcategory_names = dict.fromkeys(
+            subcategory.name
+            for sense in entry.senses.all()
+            for subcategory in sense.subcategories.all()
+        )
 
-        for text_obj in entry.texts.all():
-            region_name = text_obj.region.name if text_obj.region else None
+        for sense in entry.senses.all():
+            for text_obj in sense.texts.all():
+                if text_obj.pk in seen_text_ids:
+                    continue
 
-            if selected_regions and region_name not in selected_regions:
-                continue
+                region_name = text_obj.region.name if text_obj.region else None
 
-            examples.append({
-                "text": text_obj.text,
-                "region": region_name,
-            })
-            if region_name:
-                region_names.add(region_name)
+                if selected_regions and region_name not in selected_regions:
+                    continue
+
+                seen_text_ids.add(text_obj.pk)
+                examples.append({
+                    "text": text_obj.text,
+                    "region": region_name,
+                })
+                if region_name:
+                    region_names.add(region_name)
 
         if selected_regions and not examples:
             continue
@@ -77,9 +88,15 @@ def search_api(request):
             "accent": entry.accent,
             "meaning": _meanings(entry),
             "grammatical_features": entry.grammatical_features,
-            "subcategories": list(
-                entry.subcategories.values_list("name", flat=True)
-            ),
+            "forms": [
+                {
+                    "form": form.form,
+                    "accent": form.accent,
+                    "grammatical_features": form.grammatical_features,
+                }
+                for form in entry.lexical_forms.all()
+            ],
+            "subcategories": list(subcategory_names),
             "regions": list(region_names),
             "examples": examples,
         })
@@ -97,7 +114,7 @@ def search_api(request):
 def map_api(request):
     search = request.GET.get("search", "").strip()
 
-    qs = LexicalEntry.objects.prefetch_related("texts__region", "senses")
+    qs = LexicalEntry.objects.prefetch_related("senses__texts__region")
     if search:
         qs = qs.filter(word__icontains=search)
 
@@ -105,7 +122,8 @@ def map_api(request):
     for entry in qs[:50]:
         regions = {
             text_obj.region.name
-            for text_obj in entry.texts.all()
+            for sense in entry.senses.all()
+            for text_obj in sense.texts.all()
             if text_obj.region
         }
 

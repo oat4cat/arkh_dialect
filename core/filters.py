@@ -1,21 +1,27 @@
 # core/filters.py
 import django_filters
+from django.db.models import Q
 from .models import LexicalEntry, Subcategory, Region
 
 class LexicalEntryFilter(django_filters.FilterSet):
     # Поиск по слову (регистронезависимый, частичное совпадение)
-    word = django_filters.CharFilter(lookup_expr='icontains', field_name='word')
+    word = django_filters.CharFilter(method='filter_word')
+
+    def filter_word(self, queryset, name, value):
+        return queryset.filter(
+            Q(word__icontains=value) | Q(lexical_forms__form__icontains=value)
+        ).distinct()
     
     # Фильтр по подкатегориям (множественный выбор)
     subcategories = django_filters.ModelMultipleChoiceFilter(
-        field_name='subcategories__name',
+        field_name='senses__subcategories__name',
         queryset=Subcategory.objects.all(),
         to_field_name='name'
     )
     
-    # Фильтр по регионам (через Text → Region)
+    # Фильтр по регионам (через Sense → Text → Region)
     regions = django_filters.ModelMultipleChoiceFilter(
-        field_name='texts__region__name', 
+        field_name='senses__texts__region__name',
         queryset=Region.objects.all(),
         to_field_name='name'
     )

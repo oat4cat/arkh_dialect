@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     Category,
     LexicalEntry,
+    LexicalForm,
     LexicalRelation,
     Region,
     Sense,
@@ -16,6 +17,12 @@ class SenseInline(admin.TabularInline):
     model = Sense
     extra = 0
     fields = ("sense_number", "meaning")
+
+
+class LexicalFormInline(admin.TabularInline):
+    model = LexicalForm
+    extra = 0
+    fields = ("form", "accent", "grammatical_features")
 
 
 class LexicalRelationInline(admin.TabularInline):
@@ -39,13 +46,13 @@ class LexicalEntryAdmin(admin.ModelAdmin):
     list_display = ("word", "accent", "part_of_speech", "get_regions_list")
     list_filter = ("part_of_speech",)
     search_fields = ("word", "accent", "senses__meaning")
-    inlines = (SenseInline, LexicalRelationInline)
+    inlines = (LexicalFormInline, SenseInline, LexicalRelationInline)
 
     @admin.display(description="Районы")
     def get_regions_list(self, obj):
         regions = (
-            obj.texts.filter(region__isnull=False)
-            .values_list("region__name", flat=True)
+            obj.senses.filter(texts__region__isnull=False)
+            .values_list("texts__region__name", flat=True)
             .distinct()
         )
         names = list(regions[:4])

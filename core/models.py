@@ -43,46 +43,6 @@ class Subcategory(models.Model):
     def __str__(self): return self.name
 
 
-class Word(models.Model):
-    word = models.CharField("Слово", max_length=255)
-    meaning = models.TextField("Значение", blank=True, null=True)
-    root = models.CharField("Корень", max_length=255, blank=True, null=True)
-    part_of_speech = models.CharField("Часть речи", max_length=100, blank=True, null=True)
-    grammatical_features = models.CharField("Грамматические характеристики", max_length=255, blank=True, null=True)
-    accent = models.CharField("Слово с ударением", max_length=255, blank=True, null=True)
-    multimedia = models.BinaryField(blank=True, null=True)
-
-
-    subcategories = models.ManyToManyField(Subcategory, through='SubcategoryWord', related_name='words', blank=True)
- 
-    class Meta:
-        managed = False
-        db_table = 'Word'
-        verbose_name = "Слово"
-        verbose_name_plural = "Слова"
-
-    def __str__(self): return self.word
-
-    @property
-    def region_names(self):
-        return list(
-            self.text_set.values_list('region__name', flat=True)
-            .distinct()
-            .exclude(region__isnull=True)
-        )
-
-
-class SubcategoryWord(models.Model):
-    subcategory = models.ForeignKey(Subcategory, on_delete=models.CASCADE, db_column='subcategory', related_name='subcategorywords')
-    word = models.ForeignKey(Word, on_delete=models.CASCADE, db_column='word', related_name='subcategorywords')
-    # Составной ключ, точно как в вашей БД
-    pk = CompositePrimaryKey('subcategory', 'word')
-
-    class Meta:
-        managed = False
-        db_table = 'Subcategory_Word'
-
-
 class Text(models.Model):
     text = models.TextField("Текст примера")
     year = models.CharField("Год", max_length=20, blank=True, null=True)
@@ -99,16 +59,6 @@ class Text(models.Model):
         return f"{self.text[:40]}..." if self.text else "Без текста"
 
 
-class TextWord(models.Model):
-    text = models.ForeignKey(Text, on_delete=models.CASCADE, db_column='text', related_name='textwords')
-    word = models.ForeignKey(Word, on_delete=models.CASCADE, db_column='word', related_name='textwords')
-    pk = CompositePrimaryKey('text', 'word')
-
-    class Meta:
-        managed = False
-        db_table = 'Text_Word'
-
-
 class LexicalEntry(models.Model):
     word = models.TextField("Слово")
     root = models.TextField("Корень", blank=True, null=True)
@@ -118,19 +68,6 @@ class LexicalEntry(models.Model):
     )
     accent = models.TextField("Слово с ударением", blank=True, null=True)
     multimedia = models.BinaryField(blank=True, null=True)
-
-    subcategories = models.ManyToManyField(
-        Subcategory,
-        through='LexicalEntrySubcategory',
-        related_name='lexical_entries',
-        blank=True,
-    )
-    texts = models.ManyToManyField(
-        'Text',
-        through='TextLexicalEntry',
-        related_name='lexical_entries',
-        blank=True,
-    )
 
     class Meta:
         managed = False
@@ -151,42 +88,27 @@ class LexicalEntry(models.Model):
         )
 
 
-class LexicalEntrySubcategory(models.Model):
+class LexicalForm(models.Model):
     lexical_entry = models.ForeignKey(
         LexicalEntry,
         on_delete=models.CASCADE,
         db_column='lexical_entry_id',
+        related_name='lexical_forms',
     )
-    subcategory = models.ForeignKey(
-        Subcategory,
-        on_delete=models.CASCADE,
-        db_column='subcategory_id',
+    form = models.TextField("Форма")
+    accent = models.TextField("Форма с ударением", blank=True, null=True)
+    grammatical_features = models.TextField(
+        "Грамматические характеристики", blank=True, null=True
     )
-
-    pk = CompositePrimaryKey('lexical_entry', 'subcategory')
 
     class Meta:
         managed = False
-        db_table = 'LexicalEntry_Subcategory'
+        db_table = 'LexicalForm'
+        verbose_name = "Форма лексемы"
+        verbose_name_plural = "Формы лексем"
 
-
-class TextLexicalEntry(models.Model):
-    text = models.ForeignKey(
-        Text,
-        on_delete=models.CASCADE,
-        db_column='text_id',
-    )
-    lexical_entry = models.ForeignKey(
-        LexicalEntry,
-        on_delete=models.CASCADE,
-        db_column='lexical_entry_id',
-    )
-
-    pk = CompositePrimaryKey('text', 'lexical_entry')
-
-    class Meta:
-        managed = False
-        db_table = 'Text_LexicalEntry'
+    def __str__(self):
+        return self.form
 
 
 class Sense(models.Model):
@@ -229,7 +151,7 @@ class SenseText(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'SenseText'
+        db_table = 'Sense_Text'
 
 
 class SenseSubcategory(models.Model):
@@ -243,7 +165,7 @@ class SenseSubcategory(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'SenseSubcategory'
+        db_table = 'Sense_Subcategory'
 
 
 class LexicalRelation(models.Model):

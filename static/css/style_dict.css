@@ -542,13 +542,13 @@ body {
     color: #ECEFF6;
 }
 
-.pagination .active a.page-link {
+.pagination .active .page-link {
     background: #002C5B;
     border-color: #ECEFF6;
     color: #ECEFF6;
 }
 
-.pagination .active a.page-link:hover {
+.pagination .active .page-link:hover {
     color: #000;
 }
 

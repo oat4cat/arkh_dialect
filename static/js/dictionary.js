@@ -241,6 +241,18 @@ function createWordArticle(word) {
         article.appendChild(meaning);
     }
 
+    if (word.forms?.length) {
+        const forms = document.createElement('div');
+        forms.className = 'word-meaning';
+        forms.textContent = `Формы: ${word.forms.map(form => {
+            const grammar = form.grammatical_features
+                ? ` (${form.grammatical_features})`
+                : '';
+            return `${form.accent || form.form}${grammar}`;
+        }).join('; ')}`;
+        article.appendChild(forms);
+    }
+
     word.examples.forEach(ex => {
         const example = document.createElement('div');
         example.className = 'word-example';
@@ -375,9 +387,10 @@ function generatePaginationHTML(total, current) {
     let html = '';
 
     const addPage = (pageNum, isActive) => {
-        const cls = isActive ? 'disabled' : '';
+        const cls = isActive ? 'active' : '';
         const onclick = isActive ? '' : `onclick="pagination(this)"`;
-        html += `<li class="page-item ${cls}" data-page="${pageNum}" ${onclick}><span class="page-link">${pageNum}</span></li>`;
+        const ariaCurrent = isActive ? 'aria-current="page"' : '';
+        html += `<li class="page-item ${cls}" data-page="${pageNum}" ${ariaCurrent} ${onclick}><span class="page-link">${pageNum}</span></li>`;
     };
 
     addPage(1, current === 1);
@@ -401,7 +414,8 @@ function generatePaginationHTML(total, current) {
 
 function renderPagination(data) {
     // Удаляем старую пагинацию
-    $('.footer .pagination-row, .footer .to_page').remove();
+    const container = $('#pagination');
+    container.empty();
     if (data.total_pages <= 1) return;
 
     const html = `
@@ -417,7 +431,7 @@ function renderPagination(data) {
             <button class="submit_page" onclick="move_to_page()">→</button>
         </div>`;
 
-    $('.footer').prepend(html);
+    container.html(html);
 }
 
 function pagination(clickedElement) {
