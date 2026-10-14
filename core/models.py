@@ -118,26 +118,30 @@ class Sense(models.Model):
         db_column='lexical_entry_id',
         related_name='senses',
     )
-    sense_number = models.IntegerField(blank=True, null=True)
-    meaning = models.TextField(blank=True, null=True)
+    sense_number = models.IntegerField("Номер значения", blank=True, null=True)
+    meaning = models.TextField("Значение", blank=True, null=True)
 
     texts = models.ManyToManyField(
         Text,
         through='SenseText',
         related_name='senses',
         blank=True,
+        verbose_name='Пример употребления',
     )
     subcategories = models.ManyToManyField(
         Subcategory,
         through='SenseSubcategory',
         related_name='senses',
         blank=True,
+        verbose_name='Подкатегория',
     )
 
     class Meta:
         managed = False
         db_table = 'Sense'
         unique_together = (('lexical_entry', 'sense_number'),)
+        verbose_name = "Значение лексемы"
+        verbose_name_plural = "Значения лексем"
 
 
 class SenseText(models.Model):
@@ -152,6 +156,8 @@ class SenseText(models.Model):
     class Meta:
         managed = False
         db_table = 'Sense_Text'
+        verbose_name = "Пример употребления для значения лексемы"
+        verbose_name_plural = "Примеры употребления для значения лексемы"
 
 
 class SenseSubcategory(models.Model):
@@ -166,6 +172,8 @@ class SenseSubcategory(models.Model):
     class Meta:
         managed = False
         db_table = 'Sense_Subcategory'
+        verbose_name = "Подкатегория для значения лексемы"
+        verbose_name_plural = "Подкатегории для значения лексемы"
 
 
 class LexicalRelation(models.Model):
@@ -187,6 +195,8 @@ class LexicalRelation(models.Model):
     class Meta:
         managed = False
         db_table = 'LexicalRelation'
+        verbose_name = "Отношение лексемы к другим лексемам"
+        verbose_name_plural = "Отношения между лексемами"
 
 
 class SenseRelation(models.Model):
@@ -208,3 +218,5 @@ class SenseRelation(models.Model):
     class Meta:
         managed = False
         db_table = 'SenseRelation'
+        verbose_name = "Отношение значения лексемы к другим значениям"
+        verbose_name_plural = "Отношения между значениями лексем"

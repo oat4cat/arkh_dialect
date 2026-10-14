@@ -8,6 +8,7 @@ from .models import (
     Region,
     Sense,
     SenseRelation,
+    SenseText,
     Subcategory,
     Text,
 )
@@ -17,12 +18,16 @@ class SenseInline(admin.TabularInline):
     model = Sense
     extra = 0
     fields = ("sense_number", "meaning")
+    verbose_name = "смысл"
+    verbose_name_plural = "Смыслы"
 
 
 class LexicalFormInline(admin.TabularInline):
     model = LexicalForm
     extra = 0
     fields = ("form", "accent", "grammatical_features")
+    verbose_name = "форма лексемы"
+    verbose_name_plural = "Формы лексемы"
 
 
 class LexicalRelationInline(admin.TabularInline):
@@ -31,6 +36,8 @@ class LexicalRelationInline(admin.TabularInline):
     extra = 0
     fields = ("target_lexeme", "relation_type", "status")
     autocomplete_fields = ("target_lexeme",)
+    verbose_name = "связь лексемы"
+    verbose_name_plural = "Связи лексемы"
 
 
 class SenseRelationInline(admin.TabularInline):
@@ -39,6 +46,26 @@ class SenseRelationInline(admin.TabularInline):
     extra = 0
     fields = ("target_sense", "relation_type", "status")
     autocomplete_fields = ("target_sense",)
+    verbose_name = "связь смысла"
+    verbose_name_plural = "Связи смысла"
+
+
+class SenseTextInline(admin.TabularInline):
+    model = SenseText
+    extra = 0
+    fields = ("text",)
+    autocomplete_fields = ("text",)
+    verbose_name = "пример употребления"
+    verbose_name_plural = "Примеры употребления"
+
+
+class TextSenseInline(admin.TabularInline):
+    model = SenseText
+    extra = 0
+    fields = ("sense",)
+    autocomplete_fields = ("sense",)
+    verbose_name = "смысл"
+    verbose_name_plural = "Связанные смыслы"
 
 
 @admin.register(LexicalEntry)
@@ -63,7 +90,7 @@ class LexicalEntryAdmin(admin.ModelAdmin):
 class SenseAdmin(admin.ModelAdmin):
     list_display = ("lexical_entry", "sense_number", "meaning")
     search_fields = ("lexical_entry__word", "meaning")
-    inlines = (SenseRelationInline,)
+    inlines = (SenseTextInline, SenseRelationInline)
 
 
 @admin.register(LexicalRelation)
@@ -120,6 +147,7 @@ class TextAdmin(admin.ModelAdmin):
     list_display = ("text_short", "region", "year")
     list_filter = ("region",)
     search_fields = ("text",)
+    inlines = (TextSenseInline,)
 
     @admin.display(description="Текст примера")
     def text_short(self, obj):
