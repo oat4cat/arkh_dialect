@@ -335,10 +335,11 @@ function loadGraph(word, container) {
 }
 
 /**
- * Отрисовывает граф понятий через Cytoscape.js: слово → концепты → соседние
- * лексемы. Клик по лексеме — поиск слова; чипы подкатегорий под графом —
- * поиск по подкатегории; наведение на узел — подсказка со значением.
- * Непроверенные узлы помечаются пунктирной рамкой.
+ * Отрисовывает граф понятий через Cytoscape.js. Начальный вид: слово → его
+ * концепты (с числом соседей); соседние лексемы скрыты под концептами —
+ * клик по концепту разворачивает/сворачивает его топ-N (полный список
+ * живёт в БД). Клик по лексеме-соседу — поиск слова; чипы подкатегорий
+ * под графом — поиск по подкатегории; непроверенные узлы — пунктир.
  *
  * @param {Object} data - ответ /api/graph/
  * @param {Object} container - DOM-контейнер под граф
@@ -359,48 +360,17 @@ function renderGraph(data, container) {
     const tooltip = container.querySelector('.word-graph-tooltip');
     const subcatsBox = container.querySelector('.word-graph-subcats');
 
-    const elements = [];
-    const nodeIds = new Set();
-    const edgeIds = new Set();
-    const subcats = new Set();
     const rootId = `w:${data.word}`;
-
-    const addNode = (id, nodeData) => {
-        if (nodeIds.has(id)) return;
-        nodeIds.add(id);
-        elements.push({ data: Object.assign({ id: id }, nodeData) });
-    };
-    const addEdge = (source, target) => {
-        const key = `${source}->${target}`;
-        if (edgeIds.has(key)) return;
-        edgeIds.add(key);
-        elements.push({ data: { id: `e:${key}`, source: source, target: target } });
-    };
-
-    addNode(rootId, { label: data.word, kind: 'root' });
+    const concepts = new Map();  // concept_id -> концепт с топ-N соседями
+    const subcats = new Set();
 
     senses.forEach(sense => {
         sense.subcategories.forEach(name => subcats.add(name));
         sense.concepts.forEach(concept => {
-            const conceptId = `c:${concept.concept_id}`;
-            addNode(conceptId, {
-                label: concept.name,
-                kind: 'concept',
-                unchecked: concept.status === 'unchecked'
-            });
-            addEdge(rootId, conceptId);
-            concept.neighbors.forEach(n => {
-                const neighborId = `w:${n.word}`;
-                addNode(neighborId, {
-                    label: n.accent || n.word,
-                    kind: 'neighbor',
-                    word: n.word,
-                    unchecked: n.status === 'unchecked',
-                    tooltip: n.meaning + (n.subcategories.length ? `\n${n.subcategories.join(', ')}` : '')
-                });
-                n.subcategories.forEach(name => subcats.add(name));
-                addEdge(conceptId, neighborId);
-            });
+            if (!concepts.has(concept.concept_id)) {
+                concepts.set(concept.concept_id, concept);
+            }
+            concept.neighbors.forEach(n => n.subcategories.forEach(name => subcats.add(name)));
         });
     });
 
@@ -414,6 +384,26 @@ function renderGraph(data, container) {
             subcatsBox.appendChild(chip);
         });
     }
+
+    const elements = [{ data: { id: rootId, label: data.word, kind: 'root' } }];
+    concepts.forEach(concept => {
+        const conceptId = `c:${concept.concept_id}`;
+        elements.push({ data: {
+            id: conceptId,
+            label: `${concept.name} (${concept.neighbors_total})`,
+            name: concept.name,
+            kind: 'concept',
+            unchecked: concept.status === 'unchecked',
+            expanded: false,
+            neighbors: concept.neighbors,
+            neighbors_total: concept.neighbors_total
+        } });
+        elements.push({ data: {
+            id: `e:root-${concept.concept_id}`,
+            source: rootId,
+            target: conceptId
+        } });
+    });
 
     const cy = cytoscape({
         container: canvas,
@@ -432,6 +422,8 @@ function renderGraph(data, container) {
                     'font-size': 13,
                     'font-family': 'Inter, sans-serif',
                     'color': '#002C5B',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
                     'border-width': 1.5,
                     'border-color': '#002C5B'
                 }
@@ -482,6 +474,11 @@ function renderGraph(data, container) {
         }
     });
 
+    // Клик по концепту — развернуть/свернуть его соседей
+    cy.on('tap', 'node[kind = "concept"]', function (event) {
+        toggleConcept(cy, event.target);
+    });
+
     // Клик по лексеме-соседу — поиск этого слова
     cy.on('tap', 'node[kind = "neighbor"]', function (event) {
         $('#word').val(event.target.data('word'));
@@ -491,7 +488,8 @@ function renderGraph(data, container) {
     // Наведение: курсор и подсказка со значением
     cy.on('mouseover', 'node', function (event) {
         const node = event.target;
-        canvas.style.cursor = node.data('kind') === 'neighbor' ? 'pointer' : 'default';
+        const kind = node.data('kind');
+        canvas.style.cursor = (kind === 'neighbor' || kind === 'concept') ? 'pointer' : 'default';
         const text = node.data('tooltip');
         if (!text) return;
         tooltip.textContent = text;
@@ -507,6 +505,72 @@ function renderGraph(data, container) {
     $(container).on('click', '.graph-chip', function () {
         searchBySubcategory($(this).data('subcategory'));
     });
+}
+
+/**
+ * Разворачивает или сворачивает соседей концепта (слова с тем же концептом).
+ * Сосед, подходящий к двум развёрнутым концептам, остаётся, пока нужен.
+ *
+ * @param {Object} cy - экземпляр Cytoscape
+ * @param {Object} node - узел концепта
+ */
+function toggleConcept(cy, node) {
+    const conceptNodeId = node.id();
+
+    if (node.data('expanded')) {
+        const edges = node.connectedEdges().toArray()
+            .filter(e => e.data('source') === conceptNodeId);
+        const neighborIds = edges.map(e => e.data('target'));
+        edges.forEach(e => e.remove());
+        neighborIds.forEach(id => {
+            const neighbor = cy.getElementById(id);
+            if (neighbor.nonempty() && neighbor.connectedEdges().empty()) {
+                neighbor.remove();
+            }
+        });
+        node.data('expanded', false);
+        node.data('label', `${node.data('name')} (${node.data('neighbors_total')})`);
+    } else {
+        node.data('neighbors').forEach(n => {
+            const neighborId = `w:${n.word}`;
+            if (cy.getElementById(neighborId).empty()) {
+                cy.add({
+                    group: 'nodes',
+                    data: {
+                        id: neighborId,
+                        label: n.accent || n.word,
+                        kind: 'neighbor',
+                        word: n.word,
+                        unchecked: n.status === 'unchecked',
+                        tooltip: n.meaning + (n.subcategories.length ? `\n${n.subcategories.join(', ')}` : '')
+                    }
+                });
+            }
+            const edgeId = `e:${conceptNodeId}->${neighborId}`;
+            if (cy.getElementById(edgeId).empty()) {
+                cy.add({
+                    group: 'edges',
+                    data: { id: edgeId, source: conceptNodeId, target: neighborId }
+                });
+            }
+        });
+        node.data('expanded', true);
+        node.data('label', node.data('name'));
+        runGraphLayout(cy);
+    }
+}
+
+/**
+ * Перераскладка после развёртки концепта (позиции остальных сохраняются)
+ */
+function runGraphLayout(cy) {
+    cy.layout({
+        name: 'cose',
+        animate: true,
+        randomize: false,
+        idealEdgeLength: 90,
+        nodeRepulsion: 6000
+    }).run();
 }
 
 /**

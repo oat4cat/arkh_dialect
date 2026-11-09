@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.core.paginator import Paginator
 from .filters import LexicalEntryFilter  
-from .models import Category, Concept, ConceptSense, LexicalEntry, Region, Sense
+from .models import Category, ConceptSense, LexicalEntry, Region, Sense, SenseSubcategory
 
 
 def _meanings(entry):
@@ -180,31 +180,42 @@ def _subcategory_names(sense):
     return [subcategory.name for subcategory in sense.subcategories.all()]
 
 
-def _neighbor_payload(link, own_sense_ids):
+# Сколько соседей показывать на один концепт в карточке. Хабы вроде «тест»
+# собирают 1000+ членов; без лимита JSON раздувается до сотен килобайт.
+# Остальные связи никуда не деваются — в БД хранятся все, это ограничение
+# только отображения (полный список открывается отдельно, позже).
+MAX_NEIGHBORS_PER_CONCEPT = 5
+
+
+def _neighbor_payload(sense, link, subcategories):
     """Соседнее толкование (чужой лексемы) для узла графа."""
-    sense = link.sense
     return {
         "word": sense.lexical_entry.word,
         "accent": sense.lexical_entry.accent or "",
         "sense_id": sense.id,
         "meaning": sense.meaning or "",
         "status": link.status,
-        "subcategories": _subcategory_names(sense),
+        "subcategories": subcategories,
     }
 
 
-def _concept_payload(concept, own_sense_ids):
-    """Концепт и связанные с ним чужие толкования."""
+def _concept_payload(concept, member_links, senses_by_id, subcats_by_sense, own_sense_ids):
+    """Концепт и топ его чужих толкований для карточки (с полным числом)."""
     neighbors = [
-        _neighbor_payload(link, own_sense_ids)
-        for link in concept.sense_links.all()
-        if link.status != "rejected" and link.sense_id not in own_sense_ids
+        _neighbor_payload(
+            senses_by_id[link.sense_id], link,
+            subcats_by_sense.get(link.sense_id, []),
+        )
+        for link in member_links
+        if link.sense_id not in own_sense_ids
     ]
+    neighbors.sort(key=lambda n: (n["word"], n["sense_id"]))
     return {
         "concept_id": concept.id,
         "name": concept.name,
         "status": concept.status,
-        "neighbors": neighbors,
+        "neighbors": neighbors[:MAX_NEIGHBORS_PER_CONCEPT],
+        "neighbors_total": len(neighbors),
     }
 
 
@@ -224,16 +235,12 @@ def graph_api(request):
     own_sense_ids = {sense.id for sense in senses}
 
     # Неотклонённые связи толкований слова с неотклонёнными концептами
-    own_links = (
+    own_links = list(
         ConceptSense.objects
         .filter(sense__in=senses)
         .exclude(status="rejected")
         .exclude(concept__status="rejected")
         .select_related("concept")
-        .prefetch_related(
-            "concept__sense_links__sense__lexical_entry",
-            "concept__sense_links__sense__subcategories",
-        )
     )
 
     concepts_by_sense = {}
@@ -241,17 +248,54 @@ def graph_api(request):
         concepts_by_sense.setdefault(link.sense_id, []).append(link.concept)
 
     payload = []
-    for sense in senses:
-        concepts = concepts_by_sense.get(sense.id, [])
-        if not concepts:
-            continue
-        payload.append({
-            "sense_id": sense.id,
-            "meaning": sense.meaning or "",
-            "subcategories": _subcategory_names(sense),
-            "concepts": [
-                _concept_payload(concept, own_sense_ids) for concept in concepts
-            ],
-        })
+    if own_links:
+        concept_ids = sorted({link.concept_id for link in own_links})
+
+        # Соседние толкования и подкатегории тянем подзапросами: SQLite
+        # получает IN (SELECT ...), а не 1000+ параметров — Django разбивает
+        # длинный параметризованный IN на OR-цепочки и упирается в лимит
+        # глубины выражения (проверено на хабах вроде «тест», 1200+ членов).
+        member_senses_qs = Sense.objects.filter(
+            id__in=ConceptSense.objects
+            .filter(concept_id__in=concept_ids)
+            .values("sense_id")
+        )
+        member_links = list(
+            ConceptSense.objects
+            .filter(concept_id__in=concept_ids)
+            .exclude(status="rejected")
+        )
+        senses_by_id = {
+            sense.id: sense
+            for sense in member_senses_qs.select_related("lexical_entry")
+        }
+        subcats_by_sense = {}
+        for row in (
+            SenseSubcategory.objects
+            .filter(sense__in=member_senses_qs)
+            .select_related("subcategory")
+        ):
+            subcats_by_sense.setdefault(row.sense_id, []).append(row.subcategory.name)
+
+        members_by_concept = {}
+        for link in member_links:
+            members_by_concept.setdefault(link.concept_id, []).append(link)
+
+        for sense in senses:
+            concepts = concepts_by_sense.get(sense.id, [])
+            if not concepts:
+                continue
+            payload.append({
+                "sense_id": sense.id,
+                "meaning": sense.meaning or "",
+                "subcategories": _subcategory_names(sense),
+                "concepts": [
+                    _concept_payload(
+                        concept, members_by_concept.get(concept.id, []),
+                        senses_by_id, subcats_by_sense, own_sense_ids,
+                    )
+                    for concept in concepts
+                ],
+            })
 
     return JsonResponse({"word": word, "senses": payload})

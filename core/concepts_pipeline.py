@@ -44,11 +44,27 @@ SIM_BLOCK = 2000
 # если рядом завёлся отклонённый одноимённый.
 STATUS_PRIORITY = {"approved": 3, "rejected": 2, "unchecked": 1}
 
+# Кандидаты-словесный мусор, прошедший POS-фильтр. «Обычный» сознательно
+# НЕ входит: это осмысленная помета «расхожее, частое явление».
+CONCEPT_STOPWORDS = {
+    "быть", "иметь", "мочь", "стать", "являться",
+    "очень", "много", "мало", "совсем", "едва",
+}
+
+# Леммы короче — почти всегда шум («е», «со»).
+MIN_LEMMA_LENGTH = 3
+
+# Кап размера компоненты: без него UnionFind склеивает «снежный ком»
+# (мега-кластер «тест»: 764 формы, ~1250 толкований, полсловаря).
+# Точному совпадению лемм кап не мешает: одинаковая лемма — один концепт.
+MAX_CLUSTER_SIZE = 100
+
 
 class UnionFind:
     def __init__(self, n):
         self.parent = list(range(n))
         self.rank = [0] * n
+        self.size = [1] * n
 
     def find(self, x):
         if self.parent[x] != x:
@@ -56,14 +72,26 @@ class UnionFind:
         return self.parent[x]
 
     def union(self, x, y):
+        """Безусловное объединение (для совпадающих лемм)."""
         root_x, root_y = self.find(x), self.find(y)
         if root_x == root_y:
             return
         if self.rank[root_x] < self.rank[root_y]:
             root_x, root_y = root_y, root_x
         self.parent[root_y] = root_x
+        self.size[root_x] += self.size[root_y]
         if self.rank[root_x] == self.rank[root_y]:
             self.rank[root_x] += 1
+
+    def union_capped(self, x, y, cap):
+        """Объединение с капом размера: False, если компонента не влезла."""
+        root_x, root_y = self.find(x), self.find(y)
+        if root_x == root_y:
+            return True
+        if self.size[root_x] + self.size[root_y] > cap:
+            return False
+        self.union(x, y)
+        return True
 
 
 def normalize_text(text):
@@ -137,6 +165,9 @@ def extract_candidates(meanings, nlp):
                 if _is_negated(word, words):
                     lemma = "не " + lemma
                     surface = "не " + surface
+                base = lemma.removeprefix("не ")
+                if len(base) < MIN_LEMMA_LENGTH or base in CONCEPT_STOPWORDS:
+                    continue
                 candidates.append({
                     "sense_id": item["id"],
                     "lemma": lemma,
@@ -160,8 +191,10 @@ def embed_candidates(candidates, model):
 def cluster_candidates(candidates, embeddings):
     """Кластеризация UnionFind по комбинированному сходству.
 
-    Сходство = 0.7 косинус эмбеддингов + 0.3 косинус char-TFIDF лемм;
-    полностью совпадающие леммы объединяем безусловно (как в черновике).
+    Сходство = 0.7 косинус эмбеддингов + 0.3 косинус char-TFIDF лемм.
+    Полностью совпадающие леммы объединяем безусловно (как в черновике),
+    сходство по порогу — с капом размера компоненты MAX_CLUSTER_SIZE,
+    иначе UnionFind склеивает снежный ком на полсловаря (бывший «тест»).
     """
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.preprocessing import normalize as sk_normalize
@@ -195,7 +228,8 @@ def cluster_candidates(candidates, embeddings):
         for r, c in zip(rows, cols):
             i, j = start + int(r), int(c)
             if j > i:
-                uf.union(i, j)
+                # Кап останавливает снежный ком; лишние пары просто не сливаются.
+                uf.union_capped(i, j, MAX_CLUSTER_SIZE)
 
     return [uf.find(i) for i in range(n)]
 
