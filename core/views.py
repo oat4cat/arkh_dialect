@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.core.paginator import Paginator
 from .filters import LexicalEntryFilter  
-from .models import Category, LexicalEntry, Region
+from .models import Category, Concept, ConceptSense, LexicalEntry, Region, Sense
 
 
 def _meanings(entry):
@@ -173,3 +173,85 @@ def get_pos_api(request):
     )
     pos_list = [pos for pos in pos_list if pos and pos.strip()]
     return JsonResponse(pos_list, safe=False)
+
+
+def _subcategory_names(sense):
+    """Тематические подкатегории толкования."""
+    return [subcategory.name for subcategory in sense.subcategories.all()]
+
+
+def _neighbor_payload(link, own_sense_ids):
+    """Соседнее толкование (чужой лексемы) для узла графа."""
+    sense = link.sense
+    return {
+        "word": sense.lexical_entry.word,
+        "accent": sense.lexical_entry.accent or "",
+        "sense_id": sense.id,
+        "meaning": sense.meaning or "",
+        "status": link.status,
+        "subcategories": _subcategory_names(sense),
+    }
+
+
+def _concept_payload(concept, own_sense_ids):
+    """Концепт и связанные с ним чужие толкования."""
+    neighbors = [
+        _neighbor_payload(link, own_sense_ids)
+        for link in concept.sense_links.all()
+        if link.status != "rejected" and link.sense_id not in own_sense_ids
+    ]
+    return {
+        "concept_id": concept.id,
+        "name": concept.name,
+        "status": concept.status,
+        "neighbors": neighbors,
+    }
+
+
+@require_GET
+def graph_api(request):
+    """Граф понятий для карточки: толкования слова → концепты → соседние лексемы."""
+    word = request.GET.get("word", "").strip()
+    if not word:
+        return JsonResponse({"error": "параметр word обязателен"}, status=400)
+
+    senses = list(
+        Sense.objects
+        .filter(lexical_entry__word=word)
+        .prefetch_related("subcategories")
+        .order_by("sense_number")
+    )
+    own_sense_ids = {sense.id for sense in senses}
+
+    # Неотклонённые связи толкований слова с неотклонёнными концептами
+    own_links = (
+        ConceptSense.objects
+        .filter(sense__in=senses)
+        .exclude(status="rejected")
+        .exclude(concept__status="rejected")
+        .select_related("concept")
+        .prefetch_related(
+            "concept__sense_links__sense__lexical_entry",
+            "concept__sense_links__sense__subcategories",
+        )
+    )
+
+    concepts_by_sense = {}
+    for link in own_links:
+        concepts_by_sense.setdefault(link.sense_id, []).append(link.concept)
+
+    payload = []
+    for sense in senses:
+        concepts = concepts_by_sense.get(sense.id, [])
+        if not concepts:
+            continue
+        payload.append({
+            "sense_id": sense.id,
+            "meaning": sense.meaning or "",
+            "subcategories": _subcategory_names(sense),
+            "concepts": [
+                _concept_payload(concept, own_sense_ids) for concept in concepts
+            ],
+        })
+
+    return JsonResponse({"word": word, "senses": payload})

@@ -1,7 +1,9 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import (
     Category,
+    Concept,
+    ConceptSense,
     LexicalEntry,
     LexicalForm,
     LexicalRelation,
@@ -152,3 +154,55 @@ class TextAdmin(admin.ModelAdmin):
     @admin.display(description="Текст примера")
     def text_short(self, obj):
         return obj.text[:60] + ("..." if len(obj.text) > 60 else "")
+
+
+CONCEPT_UNPROCESSED_THRESHOLD = 50  # порог подсказки о пересчёте концептов
+
+
+class ModerationActionsMixin:
+    """Actions одобрения/отклонения для моделей с полем status."""
+
+    actions = ("approve", "reject")
+
+    @admin.action(description="Одобрить выбранные записи")
+    def approve(self, request, queryset):
+        updated = queryset.update(status="approved")
+        self.message_user(request, f"Одобрено записей: {updated}.")
+
+    @admin.action(description="Отклонить выбранные записи")
+    def reject(self, request, queryset):
+        updated = queryset.update(status="rejected")
+        self.message_user(request, f"Отклонено записей: {updated}.")
+
+
+# Модели со составным PK нельзя зарегистрировать в admin отдельно,
+# поэтому связи модерируются инлайном в карточке концепта.
+class ConceptSenseInline(admin.TabularInline):
+    model = ConceptSense
+    extra = 0
+    fields = ("sense", "matched_form", "status")
+    autocomplete_fields = ("sense",)
+    verbose_name = "связь с толкованием"
+    verbose_name_plural = "Связи с толкованиями"
+
+
+@admin.register(Concept)
+class ConceptAdmin(ModerationActionsMixin, admin.ModelAdmin):
+    list_display = ("name", "frequency", "status", "links_count")
+    list_filter = ("status",)
+    search_fields = ("name",)
+    inlines = (ConceptSenseInline,)
+
+    @admin.display(description="Связей")
+    def links_count(self, obj):
+        return obj.sense_links.count()
+
+    def changelist_view(self, request, extra_context=None):
+        unprocessed = Sense.objects.filter(concept_links__isnull=True).count()
+        if unprocessed >= CONCEPT_UNPROCESSED_THRESHOLD:
+            self.message_user(
+                request,
+                f"Необсчитанных толкований: {unprocessed} — пора запустить build_concepts.",
+                messages.WARNING,
+            )
+        return super().changelist_view(request, extra_context=extra_context)

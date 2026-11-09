@@ -11,6 +11,7 @@ urlpatterns = [
     # API для JS
     path('api/search/', views.search_api, name='search_api'),
     path('api/map/', views.map_api, name='map_api'),
+    path('api/graph/', views.graph_api, name='graph_api'),
 
     # API для фильтров
     path('api/regions/', views.get_regions_api, name='get_regions'),

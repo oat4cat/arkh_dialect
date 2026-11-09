@@ -681,3 +681,76 @@ body {
     background-color: #002c5b;
     color: #eceff6;
 }
+
+/* Граф понятий в карточке (Cytoscape.js) */
+.word-graph {
+    margin-top: 20px;
+    padding-top: 12px;
+    border-top: 0.5px dashed rgba(0, 44, 91, 0.3);
+}
+
+.word-graph-toggle {
+    background: none;
+    color: #002C5B;
+    border: none;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 16px;
+    font-style: italic;
+    font-family: 'Inter', sans-serif;
+    opacity: 0.85;
+}
+
+.word-graph-toggle:hover,
+.word-graph-toggle.active {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.word-graph-body {
+    position: relative;
+    margin-top: 8px;
+    font-size: 15px;
+}
+
+.word-graph-canvas {
+    height: 380px;
+    border: 0.5px solid rgba(0, 44, 91, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.word-graph-tooltip {
+    position: absolute;
+    z-index: 5;
+    max-width: 260px;
+    padding: 6px 10px;
+    border: 0.5px solid rgba(0, 44, 91, 0.35);
+    border-radius: 8px;
+    background: #ECEFF6;
+    color: #002C5B;
+    font-size: 13px;
+    white-space: pre-line;
+    pointer-events: none;
+}
+
+.word-graph-subcats {
+    margin-top: 8px;
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.graph-chip {
+    display: inline-block;
+    margin: 2px 6px 2px 0;
+    padding: 1px 10px;
+    border: 0.5px solid rgba(0, 44, 91, 0.4);
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.graph-chip:hover {
+    background: #002C5B;
+    color: #ECEFF6;
+}

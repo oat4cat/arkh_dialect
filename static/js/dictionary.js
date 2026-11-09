@@ -267,7 +267,261 @@ function createWordArticle(word) {
         }
     });
 
+    article.appendChild(createGraphSection(word.word));
+
     return article;
+}
+
+/* 5.1 Граф понятий в карточке */
+/**
+ * Разворачиваемый раздел графа понятий. Ленивая загрузка: граф запрашивается
+ * только при первом раскрытии раздела.
+ *
+ * @param {string} word - лексема карточки
+ * @returns {Object} DOM-структура - раздел с кнопкой и контейнером графа
+ */
+function createGraphSection(word) {
+    const section = document.createElement('div');
+    section.className = 'word-graph';
+
+    const toggle = document.createElement('button');
+    toggle.className = 'word-graph-toggle';
+    toggle.type = 'button';
+    toggle.textContent = 'Связи через понятия';
+
+    const body = document.createElement('div');
+    body.className = 'word-graph-body';
+    body.style.display = 'none';
+
+    let loaded = false;
+    toggle.addEventListener('click', function () {
+        const opening = body.style.display === 'none';
+        body.style.display = opening ? 'block' : 'none';
+        toggle.classList.toggle('active', opening);
+        if (opening && !loaded) {
+            loaded = true;
+            loadGraph(word, body);
+        }
+    });
+
+    section.appendChild(toggle);
+    section.appendChild(body);
+    return section;
+}
+
+/**
+ * Запрашивает граф понятий слова и передаёт контейнер в отрисовку
+ *
+ * @param {string} word - лексема карточки
+ * @param {Object} container - DOM-контейнер под граф
+ */
+function loadGraph(word, container) {
+    container.textContent = 'Загрузка связей…';
+    $.ajax({
+        url: '/api/graph/',
+        type: 'GET',
+        data: { word: word },
+        success: function (data) {
+            try {
+                renderGraph(data, container);
+            } catch (e) {
+                container.textContent = 'Ошибка отрисовки графа: ' + e.message;
+            }
+        },
+        error: function () {
+            container.textContent = 'Не удалось загрузить связи.';
+        }
+    });
+}
+
+/**
+ * Отрисовывает граф понятий через Cytoscape.js: слово → концепты → соседние
+ * лексемы. Клик по лексеме — поиск слова; чипы подкатегорий под графом —
+ * поиск по подкатегории; наведение на узел — подсказка со значением.
+ * Непроверенные узлы помечаются пунктирной рамкой.
+ *
+ * @param {Object} data - ответ /api/graph/
+ * @param {Object} container - DOM-контейнер под граф
+ */
+function renderGraph(data, container) {
+    const senses = data.senses || [];
+    if (!senses.length) {
+        container.textContent = 'Связи через понятия не найдены.';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="word-graph-canvas"></div>
+        <div class="word-graph-subcats"></div>
+        <div class="word-graph-tooltip" style="display: none;"></div>
+    `;
+    const canvas = container.querySelector('.word-graph-canvas');
+    const tooltip = container.querySelector('.word-graph-tooltip');
+    const subcatsBox = container.querySelector('.word-graph-subcats');
+
+    const elements = [];
+    const nodeIds = new Set();
+    const edgeIds = new Set();
+    const subcats = new Set();
+    const rootId = `w:${data.word}`;
+
+    const addNode = (id, nodeData) => {
+        if (nodeIds.has(id)) return;
+        nodeIds.add(id);
+        elements.push({ data: Object.assign({ id: id }, nodeData) });
+    };
+    const addEdge = (source, target) => {
+        const key = `${source}->${target}`;
+        if (edgeIds.has(key)) return;
+        edgeIds.add(key);
+        elements.push({ data: { id: `e:${key}`, source: source, target: target } });
+    };
+
+    addNode(rootId, { label: data.word, kind: 'root' });
+
+    senses.forEach(sense => {
+        sense.subcategories.forEach(name => subcats.add(name));
+        sense.concepts.forEach(concept => {
+            const conceptId = `c:${concept.concept_id}`;
+            addNode(conceptId, {
+                label: concept.name,
+                kind: 'concept',
+                unchecked: concept.status === 'unchecked'
+            });
+            addEdge(rootId, conceptId);
+            concept.neighbors.forEach(n => {
+                const neighborId = `w:${n.word}`;
+                addNode(neighborId, {
+                    label: n.accent || n.word,
+                    kind: 'neighbor',
+                    word: n.word,
+                    unchecked: n.status === 'unchecked',
+                    tooltip: n.meaning + (n.subcategories.length ? `\n${n.subcategories.join(', ')}` : '')
+                });
+                n.subcategories.forEach(name => subcats.add(name));
+                addEdge(conceptId, neighborId);
+            });
+        });
+    });
+
+    if (subcats.size) {
+        subcatsBox.textContent = 'Подкатегории: ';
+        Array.from(subcats).slice(0, 8).forEach(name => {
+            const chip = document.createElement('span');
+            chip.className = 'graph-chip';
+            chip.dataset.subcategory = name;
+            chip.textContent = name;
+            subcatsBox.appendChild(chip);
+        });
+    }
+
+    const cy = cytoscape({
+        container: canvas,
+        elements: elements,
+        minZoom: 0.4,
+        maxZoom: 2.5,
+        wheelSensitivity: 0.3,
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'label': 'data(label)',
+                    'width': 'label',
+                    'height': 'label',
+                    'padding': '6px',
+                    'font-size': 13,
+                    'font-family': 'Inter, sans-serif',
+                    'color': '#002C5B',
+                    'border-width': 1.5,
+                    'border-color': '#002C5B'
+                }
+            },
+            {
+                selector: 'node[kind = "root"]',
+                style: {
+                    'background-color': '#ffffff',
+                    'border-width': 2.5,
+                    'font-weight': 'bold'
+                }
+            },
+            {
+                selector: 'node[kind = "concept"]',
+                style: {
+                    'background-color': '#ECEFF6',
+                    'shape': 'round-rectangle'
+                }
+            },
+            {
+                selector: 'node[kind = "neighbor"]',
+                style: {
+                    'background-color': '#ffffff'
+                }
+            },
+            {
+                selector: 'node[?unchecked]',
+                style: {
+                    'border-style': 'dashed',
+                    'opacity': 0.75
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 1.5,
+                    'line-color': 'rgba(0, 44, 91, 0.35)',
+                    'curve-style': 'bezier'
+                }
+            }
+        ],
+        layout: {
+            name: 'cose',
+            animate: false,
+            idealEdgeLength: 90,
+            nodeRepulsion: 6000,
+            randomize: true
+        }
+    });
+
+    // Клик по лексеме-соседу — поиск этого слова
+    cy.on('tap', 'node[kind = "neighbor"]', function (event) {
+        $('#word').val(event.target.data('word'));
+        filterWords(getFilters(false));
+    });
+
+    // Наведение: курсор и подсказка со значением
+    cy.on('mouseover', 'node', function (event) {
+        const node = event.target;
+        canvas.style.cursor = node.data('kind') === 'neighbor' ? 'pointer' : 'default';
+        const text = node.data('tooltip');
+        if (!text) return;
+        tooltip.textContent = text;
+        tooltip.style.display = 'block';
+        const position = event.renderedPosition;
+        tooltip.style.left = `${position.x + 14}px`;
+        tooltip.style.top = `${position.y + 14}px`;
+    });
+    cy.on('mouseout', 'node', function () {
+        tooltip.style.display = 'none';
+    });
+
+    $(container).on('click', '.graph-chip', function () {
+        searchBySubcategory($(this).data('subcategory'));
+    });
+}
+
+/**
+ * Поиск по подкатегории: добавляет тег фильтра (как при выборе в дропдауне)
+ * и запускает поиск существующим механизмом
+ *
+ * @param {string} name - название подкатегории
+ */
+function searchBySubcategory(name) {
+    const selected = $('#selected-items-subcategory');
+    if (!selected.find(`.selected-item[data="${name}"]`).length) {
+        selected.append(createSelectedTag(name, name));
+        $(`#dropdown-content-subcategory .filter[data="${name}"]`).addClass('active');
+    }
+    filterWords(getFilters(false));
 }
 
 /**

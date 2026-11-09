@@ -220,3 +220,47 @@ class SenseRelation(models.Model):
         db_table = 'SenseRelation'
         verbose_name = "Отношение значения лексемы к другим значениям"
         verbose_name_plural = "Отношения между значениями лексем"
+
+
+class Concept(models.Model):
+    name = models.TextField("Концепт")
+    frequency = models.IntegerField("Частота", default=0)
+    forms = models.TextField("Формы (JSON)", blank=True, null=True)
+    status = models.CharField("Статус", max_length=20, default="unchecked")
+    centroid_embedding = models.BinaryField("Centroid-эмбеддинг", blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'Concept'
+        verbose_name = "Концепт"
+        verbose_name_plural = "Концепты"
+
+    def __str__(self):
+        return self.name
+
+
+class ConceptSense(models.Model):
+    concept = models.ForeignKey(
+        Concept,
+        on_delete=models.CASCADE,
+        db_column='concept_id',
+        related_name='sense_links',
+    )
+    sense = models.ForeignKey(
+        Sense,
+        on_delete=models.CASCADE,
+        db_column='sense_id',
+        related_name='concept_links',
+    )
+    matched_form = models.TextField("Форма-основание связи", blank=True, null=True)
+    status = models.CharField("Статус", max_length=20, default="unchecked")
+    pk = CompositePrimaryKey('concept', 'sense')
+
+    class Meta:
+        managed = False
+        db_table = 'Concept_Sense'
+        verbose_name = "Связь концепта с толкованием"
+        verbose_name_plural = "Связи концептов с толкованиями"
+
+    def __str__(self):
+        return f"{self.concept} ↔ {self.sense}"
