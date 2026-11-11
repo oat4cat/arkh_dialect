@@ -174,8 +174,6 @@ function removeFilter(element) {
  * текущая страница, сортировка
  */
 function getFilters(page_chosen, page_num = 1) {
-    $('.prolog, .prolog_list').hide();
-
     let order = 0;
     const activeOrder = $('.order-button.active');
     if (activeOrder.length) {
@@ -201,6 +199,10 @@ function getFilters(page_chosen, page_num = 1) {
  * @returns {void}
  */
 function filterWords(filters) {
+    // Инструкция (.prolog) показывается только на чистой загрузке страницы;
+    // любой пользовательский поиск её скрывает (возврат — «Очистить поиск»/F5)
+    $('.prolog, .prolog_list').hide();
+
     $.ajax({
         url: '/api/search/',
         type: 'POST',
@@ -697,7 +699,8 @@ function runGraphLayout(cy) {
 }
 
 /**
- * Поиск по подкатегории: добавляет тег фильтра (как при выборе в дропдауне)
+ * Поиск по подкатегории: добавляет тег фильтра (как при выборе в дропдауне),
+ * очищает слово в строке поиска — чтобы вернулись все лексемы подкатегории,
  * и запускает поиск существующим механизмом
  *
  * @param {string} name - название подкатегории
@@ -708,6 +711,7 @@ function searchBySubcategory(name) {
         selected.append(createSelectedTag(name, name));
         $(`#dropdown-content-subcategory .filter[data="${name}"]`).addClass('active');
     }
+    $('#word').val('');
     filterWords(getFilters(false));
 }
 
@@ -753,7 +757,16 @@ function createWordHeader(word) {
 
     const categoryDiv = document.createElement('div');
     categoryDiv.className = 'word-category';
-    categoryDiv.textContent = escapeHtml(word.subcategories.join(', ') || '');
+    (word.subcategories || []).forEach(name => {
+        const chip = document.createElement('span');
+        chip.className = 'word-cat-chip';
+        chip.textContent = name;
+        chip.title = 'Найти все слова подкатегории';
+        chip.addEventListener('click', function () {
+            searchBySubcategory(name);
+        });
+        categoryDiv.appendChild(chip);
+    });
 
     header.appendChild(wordDiv);
     header.appendChild(categoryDiv);
@@ -905,6 +918,7 @@ $(document).ready(function () {
         }
     });
 
-    // Первая загрузка при открытии страницы
+    // Первая загрузка при открытии страницы: слова грузятся сразу, инструкция остаётся видна
     filterWords(getFilters(false));
+    $('.prolog, .prolog_list').show();
 });

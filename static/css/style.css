@@ -11,7 +11,7 @@ html {
 body{
 	border-image: url('../images/pattern.svg') round;
 	border-image-slice: 0 50%;
-	border-image-width: 100px;
+	border-image-width: 60px;
 	border-image-outset: 13px;
 	margin: 0;
   width: 100%;
@@ -220,7 +220,10 @@ h1 {
 
 
 .sources {
-	margin: 20px 100px;
+	margin: 20px auto;
+	padding: 0 20px;
+	width: 100%;
+	box-sizing: border-box;
 	display: flex;
 	align-items: stretch;
 	justify-content: space-between;
@@ -230,11 +233,11 @@ h1 {
 	align-self: center;
 }
 .one_source {
-	padding: 20px;
-	margin: 20.5px;
+	padding: 16px 20px;
+	margin: 12px 0;
 	font-weight: 500;
 	background-color: #002C5B;
-	color: #ECEFF6; 
+	color: #ECEFF6;
 	border: 2px solid #002C5B;
 	border-radius: 10px;
 }
@@ -427,16 +430,6 @@ ul, ol, li {
   background-color: #fff;
 }
 
-.carousel__slide:before {
-  content: counter(item);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate3d(-50%,-40%,70px);
-  color: #fff;
-  font-size: 2em;
-}
-
 .carousel__snapper {
   position: absolute;
   top: 0;
@@ -483,10 +476,9 @@ ul, ol, li {
 .carousel__prev,
 .carousel__next {
   position: absolute;
-  top: 0;
-  margin-top: 37.5%;
-  width: 4rem;
-  height: 4rem;
+  top: 50%;
+  width: 3.5rem;
+  height: 3.5rem;
   transform: translateY(-50%);
   border-radius: 50%;
   font-size: 0;
@@ -496,12 +488,12 @@ ul, ol, li {
 
 .carousel::before,
 .carousel__prev {
-  left: -1rem;
+  left: 0.75rem;
 }
 
 .carousel::after,
 .carousel__next {
-  right: -1rem;
+  right: 0.75rem;
 }
 
 .carousel::before,
@@ -514,7 +506,7 @@ ul, ol, li {
   background-position: center center;
   color: #fff;
   font-size: 2.5rem;
-  line-height: 4rem;
+  line-height: 3.5rem;
   text-align: center;
   pointer-events: none;
 }

@@ -13,7 +13,7 @@ html {
 body {
     border-image: url('../images/pattern.svg') round;
     border-image-slice: 0 50%;
-    border-image-width: 100px;
+    border-image-width: 60px;
     color: #002C5B;
     display: flex;
     flex-direction: column;
@@ -176,11 +176,33 @@ body {
 }
 
 .word-category {
-    text-align: right;
-    font-style: italic;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+    align-content: flex-start;
+    max-width: 40%;
     color: #002C5B;
     padding-left: 20px;
     flex-shrink: 0;
+}
+
+.word-cat-chip {
+    display: inline-block;
+    padding: 2px 12px;
+    border: 0.5px solid rgba(0, 44, 91, 0.4);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    font-size: 65%;
+    line-height: 1.5;
+    height: fit-content;
+    transition: all 0.2s;
+}
+
+.word-cat-chip:hover {
+    background: #002C5B;
+    color: #ECEFF6;
 }
 
 .word-meaning {
