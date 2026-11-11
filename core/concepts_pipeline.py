@@ -5,8 +5,8 @@
 кластеризация → таблицы `Concept` и `Concept_Sense`.
 
 Отличия от черновика:
-- кластеризация векторизована: сходство считается numpy-блоками, пары
-  выше порога собираются индексами (вместо двойного цикла по всем парам);
+- кластеризация — average linkage (scipy) над сжатой матрицей расстояний,
+  считаемой numpy-блоками (вместо двойного цикла по всем парам);
 - при перезаписи таблиц статусы модерации переносятся по совпадению
   канонического имени концепта (и пары «имя — толкование» для связей).
 
@@ -37,7 +37,7 @@ REF_PATTERN = re.compile(
 )
 
 # Размер блока сходства: пиковая память ~BLOCK * N * 4 байт на матрицу
-# вместо полной N x N при двойном цикле.
+# вместо полной N x N.
 SIM_BLOCK = 2000
 
 # Приоритет статусов при переносе: одобренное не должно слететь,
@@ -53,45 +53,6 @@ CONCEPT_STOPWORDS = {
 
 # Леммы короче — почти всегда шум («е», «со»).
 MIN_LEMMA_LENGTH = 3
-
-# Кап размера компоненты: без него UnionFind склеивает «снежный ком»
-# (мега-кластер «тест»: 764 формы, ~1250 толкований, полсловаря).
-# Точному совпадению лемм кап не мешает: одинаковая лемма — один концепт.
-MAX_CLUSTER_SIZE = 100
-
-
-class UnionFind:
-    def __init__(self, n):
-        self.parent = list(range(n))
-        self.rank = [0] * n
-        self.size = [1] * n
-
-    def find(self, x):
-        if self.parent[x] != x:
-            self.parent[x] = self.find(self.parent[x])
-        return self.parent[x]
-
-    def union(self, x, y):
-        """Безусловное объединение (для совпадающих лемм)."""
-        root_x, root_y = self.find(x), self.find(y)
-        if root_x == root_y:
-            return
-        if self.rank[root_x] < self.rank[root_y]:
-            root_x, root_y = root_y, root_x
-        self.parent[root_y] = root_x
-        self.size[root_x] += self.size[root_y]
-        if self.rank[root_x] == self.rank[root_y]:
-            self.rank[root_x] += 1
-
-    def union_capped(self, x, y, cap):
-        """Объединение с капом размера: False, если компонента не влезла."""
-        root_x, root_y = self.find(x), self.find(y)
-        if root_x == root_y:
-            return True
-        if self.size[root_x] + self.size[root_y] > cap:
-            return False
-        self.union(x, y)
-        return True
 
 
 def normalize_text(text):
@@ -121,117 +82,140 @@ def filter_meanings(meanings):
     return [m for m in meanings if not REF_PATTERN.search(m["meaning"] or "")]
 
 
-def _is_negated(word, sentence_words):
+def _is_negated(word, children_by_head):
     """Отрицание, зависящее от слова: дочерний 'advmod' с леммой не/ни."""
     return any(
-        w.head == word.id
-        and w.deprel == "advmod"
+        w.deprel == "advmod"
         and (w.lemma or "").lower() in {"не", "ни"}
-        for w in sentence_words
+        for w in children_by_head.get(word.id, [])
     )
 
 
-def _syntactic_context(word, by_id, sentence_words):
+def _syntactic_context(word, by_id, children_by_head):
     """Слово + содержательный родитель и дети — как в черновике."""
-    related = [
-        w for w in sentence_words
-        if w.head == word.id and w.upos in CONTENT_POS
-    ]
     parent = by_id.get(word.head)
     context = [word]
     if parent is not None and parent.upos in CONTENT_POS:
         context.append(parent)
-    context.extend(related)
+    context.extend(
+        w for w in children_by_head.get(word.id, [])
+        if w.upos in CONTENT_POS
+    )
     context = sorted({w.id: w for w in context}.values(), key=lambda w: w.id)
     return " ".join(w.text for w in context)
 
 
 def extract_candidates(meanings, nlp):
-    """Stanza-разбор толкований → кандидаты-концепты."""
+    """Stanza-разбор толкований → кандидаты-концепты.
+
+    Тексты нормализуются и гоняются пакетно через nlp.bulk_process: в ~5 раз
+    быстрее пословного прогона при точном паритете разбора (замер: скилл
+    dialect-graph). bulk_process возвращает документы в порядке входа —
+    sense_id восстанавливается zip-ом с исходным списком.
+    """
+    items = [(item["id"], normalize_text(item["meaning"])) for item in meanings]
+    items = [(sense_id, text) for sense_id, text in items if text]
+    if not items:
+        return []
+    docs = nlp.bulk_process([text for _, text in items])
+
     candidates = []
-    for item in meanings:
-        text = normalize_text(item["meaning"])
-        if not text:
-            continue
-        doc = nlp(text)
+    for (sense_id, _), doc in zip(items, docs):
         for sentence in doc.sentences:
             words = sentence.words
             by_id = {w.id: w for w in words}
+            # Зависимости один раз на предложение: дети по главе нужны
+            # и негации, и контексту — вместо скана всех слов на кандидата.
+            children_by_head = {}
+            for w in words:
+                children_by_head.setdefault(w.head, []).append(w)
             for word in words:
                 if word.upos not in CONTENT_POS:
                     continue
                 lemma = (word.lemma or word.text).lower()
                 surface = word.text
-                if _is_negated(word, words):
+                if _is_negated(word, children_by_head):
                     lemma = "не " + lemma
                     surface = "не " + surface
                 base = lemma.removeprefix("не ")
                 if len(base) < MIN_LEMMA_LENGTH or base in CONCEPT_STOPWORDS:
                     continue
                 candidates.append({
-                    "sense_id": item["id"],
+                    "sense_id": sense_id,
                     "lemma": lemma,
                     "surface": surface,
                     "upos": word.upos,
-                    "syntactic_context": _syntactic_context(word, by_id, words),
+                    "syntactic_context": _syntactic_context(word, by_id, children_by_head),
                 })
     return candidates
 
 
 def embed_candidates(candidates, model):
-    """Эмбеддинги кандидатов: «Понятие: lemma. Контекст: …» (нормированы)."""
+    """Эмбеддинги кандидатов: «Понятие: lemma. Контекст: …» (нормированы).
+
+    batch_size=64 — стартовая настройка; точный подбор под железо —
+    отдельным замером encode с разными размерами.
+    """
+    if not candidates:
+        dim = model.get_sentence_embedding_dimension()
+        return np.empty((0, dim), dtype=np.float32)
     texts = [
         f"Понятие: {c['lemma']}. Контекст: {c['syntactic_context']}"
         for c in candidates
     ]
-    embeddings = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+    embeddings = model.encode(
+        texts,
+        batch_size=64,
+        normalize_embeddings=True,
+        show_progress_bar=True,
+        convert_to_numpy=True,
+    )
     return np.asarray(embeddings, dtype=np.float32)
 
 
 def cluster_candidates(candidates, embeddings):
-    """Кластеризация UnionFind по комбинированному сходству.
+    """Кластеризация average linkage по комбинированному сходству.
 
-    Сходство = 0.7 косинус эмбеддингов + 0.3 косинус char-TFIDF лемм.
-    Полностью совпадающие леммы объединяем безусловно (как в черновике),
-    сходство по порогу — с капом размера компоненты MAX_CLUSTER_SIZE,
-    иначе UnionFind склеивает снежный ком на полсловаря (бывший «тест»).
+    Сходство = 0.7 косинус эмбеддингов + 0.3 косинус char-TFIDF лемм;
+    расстояние = 1 - сходство. Дендрограмма режется на расстоянии
+    1 - CLUSTER_THRESHOLD: кластер образуется, пока среднее внутрикластерное
+    расстояние не превышает порог. Среднее расстояние не даёт «снежного кома»
+    single-linkage (бывший мега-кластер «тест» на полсловаря), поэтому кап
+    размера компоненты не нужен. Отдельные пары при этом могут оказаться ниже
+    порога — осознанный компромисс; замер методов:
+    utils/кластеризация/сравнение_методов_кластеризации.md.
+    Совпадающие леммы оказываются в одном кластере автоматически: их расстояние 0.
     """
+    from scipy.cluster.hierarchy import fcluster, linkage
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.preprocessing import normalize as sk_normalize
 
     n = len(candidates)
-    if n == 0:
-        return []
+    if n <= 1:
+        return list(range(1, n + 1))
 
     char_matrix = sk_normalize(
         TfidfVectorizer(analyzer="char", ngram_range=(2, 5), min_df=1)
         .fit_transform([c["lemma"] for c in candidates])
     )
 
-    uf = UnionFind(n)
-
-    # Совпадающие леммы — в один кластер всегда.
-    first_index = {}
-    for idx, candidate in enumerate(candidates):
-        lemma = candidate["lemma"]
-        if lemma in first_index:
-            uf.union(idx, first_index[lemma])
-        else:
-            first_index[lemma] = idx
-
+    # Сжатая матрица расстояний для scipy linkage — блоками, без полной N x N.
+    dist = np.empty(n * (n - 1) // 2, dtype=np.float64)
+    pos = 0
     for start in range(0, n, SIM_BLOCK):
         end = min(start + SIM_BLOCK, n)
         semantic = embeddings[start:end] @ embeddings.T
         lexical = char_matrix[start:end] @ char_matrix.T
         combined = 0.7 * semantic + 0.3 * lexical.toarray()
-        rows, cols = np.where(combined >= CLUSTER_THRESHOLD)
-        for r, c in zip(rows, cols):
-            i, j = start + int(r), int(c)
-            if j > i:
-                # Кап останавливает снежный ком; лишние пары просто не сливаются.
-                uf.union_capped(i, j, MAX_CLUSTER_SIZE)
+        for r in range(end - start):
+            i = start + r
+            dist[pos:pos + n - i - 1] = 1.0 - combined[r, i + 1:]
+            pos += n - i - 1
+    np.clip(dist, 0.0, None, out=dist)  # float-шум вокруг сходства 1.0
 
-    return [uf.find(i) for i in range(n)]
+    tree = linkage(dist, method="average")
+    labels = fcluster(tree, t=1 - CLUSTER_THRESHOLD, criterion="distance")
+    return [int(label) for label in labels]
 
 
 def form_concepts(candidates, embeddings, labels):

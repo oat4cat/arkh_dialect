@@ -1,6 +1,9 @@
 from django.test import SimpleTestCase
 
+import numpy as np
+
 from django.core.exceptions import FieldDoesNotExist
+from . import concepts_pipeline
 from .filters import LexicalEntryFilter
 from .models import (
     LexicalEntry,
@@ -42,3 +45,27 @@ class DatabaseSchemaModelTests(SimpleTestCase):
             filters.filters["regions"].field_name,
             "senses__texts__region__name",
         )
+
+
+class ClusterCandidatesTests(SimpleTestCase):
+    def test_average_linkage_rejects_weak_bridge(self):
+        """Average linkage не склеивает цепочку a—b—c через слабый мост b—c."""
+        candidates = [
+            {"lemma": lemma, "surface": lemma, "upos": "NOUN",
+             "sense_id": i, "syntactic_context": lemma}
+            for i, lemma in enumerate(["aa", "bb", "cc"])
+        ]
+        # Косинусы пар: (0,1)≈0.956 и (1,2)≈0.946 — выше порога, (0,2)≈0.809 —
+        # ниже. Лексика у разных лемм нулевая, combined = 0.7·косинус.
+        # Single-linkage склеил бы всех транзитивно; у average linkage среднее
+        # расстояние {0,1}—{2} ≈ 0.382 > 0.35, мост не проходит.
+        angles = [0.0, 17.0, 36.0]
+        embeddings = np.array(
+            [[np.cos(np.radians(a)), np.sin(np.radians(a))] for a in angles],
+            dtype=np.float32,
+        )
+
+        labels = concepts_pipeline.cluster_candidates(candidates, embeddings)
+
+        self.assertEqual(labels[0], labels[1])
+        self.assertNotEqual(labels[0], labels[2])
