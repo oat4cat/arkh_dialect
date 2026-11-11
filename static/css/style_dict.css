@@ -754,3 +754,40 @@ body {
     background: #002C5B;
     color: #ECEFF6;
 }
+
+/* Формы лексемы в заголовке статьи («КИСЛИЦА (кисли́ца) ж.») */
+.word-forms {
+    font-size: 65%;
+    font-weight: normal;
+    text-transform: none;
+    margin: 0 8px;
+}
+
+/* Блок одного значения статьи */
+.word-sense {
+    margin: 10px 0;
+}
+
+.word-sense-number {
+    font-weight: 700;
+    font-style: normal;
+}
+
+/* Отсылка на другое слово внутри толкования */
+.word-ref {
+    color: #002C5B;
+    text-decoration: underline dotted;
+    cursor: pointer;
+}
+
+.word-ref:hover {
+    color: #004080;
+    background: rgba(0, 44, 91, 0.08);
+    border-radius: 3px;
+}
+
+/* Строка «См.: …» для отсылок, не встретившихся в тексте дословно */
+.word-refs {
+    margin-top: 4px;
+    font-size: 90%;
+}

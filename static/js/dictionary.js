@@ -219,68 +219,190 @@ function filterWords(filters) {
 
 /* 5. Отрисовка результатов */
 /**
- * Формирует словарную статью
+ * Формирует словарную статью: заголовок с формами и блок по каждому значению
+ * (толкование с отсылками, примеры, граф понятий)
  *
  * @param {Object} word - Структура слова
- * @param {string} word.meaning - Значение слова
- * @param {string[]} word.examples - Примеры употребления с районами
- * 
+ * @param {Object[]} word.senses[] - Значения лексемы
+ * @param {string[]} word.forms[] - Формы лексемы
+ *
  * @returns {Object} DOM-структура - словарная статья
  */
 function createWordArticle(word) {
     const article = document.createElement('div');
     article.className = 'word';
 
-    const header = createWordHeader(word);
-    article.appendChild(header);
+    article.appendChild(createWordHeader(word));
 
-    if (word.meaning) {
-        const meaning = document.createElement('div');
-        meaning.className = 'word-meaning';
-        meaning.innerHTML = escapeHtml(word.meaning);
-        article.appendChild(meaning);
-    }
-
-    if (word.forms?.length) {
-        const forms = document.createElement('div');
-        forms.className = 'word-meaning';
-        forms.textContent = `Формы: ${word.forms.map(form => {
-            const grammar = form.grammatical_features
-                ? ` (${form.grammatical_features})`
-                : '';
-            return `${form.accent || form.form}${grammar}`;
-        }).join('; ')}`;
-        article.appendChild(forms);
-    }
-
-    word.examples.forEach(ex => {
-        const example = document.createElement('div');
-        example.className = 'word-example';
-        example.innerHTML = escapeHtml(ex.text);
-        article.appendChild(example);
-
-        if (ex.region) {
-            const region = document.createElement('div');
-            region.className = 'word-region';
-            region.textContent = escapeHtml(ex.region);
-            article.appendChild(region);
-        }
+    const senses = word.senses || [];
+    const numbered = senses.length > 1;
+    senses.forEach(sense => {
+        article.appendChild(createSenseBlock(word, sense, numbered));
     });
-
-    article.appendChild(createGraphSection(word.word));
 
     return article;
 }
 
+/**
+ * Блок одного значения статьи: толкование, примеры с районами, граф.
+ * Нумерация значений показывается, только если их больше одного.
+ *
+ * @param {Object} word - Структура слова
+ * @param {Object} sense - Значение: sense_id, sense_number, meaning,
+ *                         references[], examples[{text, region}]
+ * @param {boolean} numbered - Показывать ли номер значения
+ * @returns {Object} DOM-структура - блок значения
+ */
+function createSenseBlock(word, sense, numbered) {
+    const block = document.createElement('div');
+    block.className = 'word-sense';
+
+    const meaning = document.createElement('div');
+    meaning.className = 'word-meaning';
+    if (numbered) {
+        const number = document.createElement('span');
+        number.className = 'word-sense-number';
+        number.textContent = `${sense.sense_number ?? ''}. `;
+        meaning.appendChild(number);
+    }
+    meaning.appendChild(createMeaningContent(sense));
+    block.appendChild(meaning);
+
+    (sense.examples || []).forEach(ex => {
+        if (ex.text?.trim()) {
+            const example = document.createElement('div');
+            example.className = 'word-example';
+            example.innerHTML = escapeHtml(ex.text);
+            block.appendChild(example);
+        }
+        if (ex.region?.trim()) {
+            const region = document.createElement('div');
+            region.className = 'word-region';
+            region.textContent = escapeHtml(ex.region);
+            block.appendChild(region);
+        }
+    });
+
+    block.appendChild(createGraphSection(word.word, sense.sense_id));
+
+    return block;
+}
+
+/**
+ * Текст толкования со ссылками-отсылками («То же, что арап», «уменьш. от …»):
+ * целевое слово из references оборачивается в кликабельный span (клик — поиск
+ * слова существующим механизмом). Отсылка, не встретившаяся в тексте
+ * дословно, выводится отдельной строкой «См.: …».
+ *
+ * @param {Object} sense - Значение: meaning, references[]
+ * @returns {Object} DocumentFragment - толкование со ссылками
+ */
+function createMeaningContent(sense) {
+    const fragment = document.createDocumentFragment();
+    const meaning = sense.meaning || '';
+    const references = sense.references || [];
+
+    const links = [];
+    if (meaning) {
+        const { norm, map } = normalizeIndexes(meaning);
+        references.forEach(ref => {
+            const target = normalizePlain(ref.word);
+            const idx = target ? norm.indexOf(target) : -1;
+            if (idx === -1) return;
+            const start = map[idx];
+            const end = map[idx + target.length - 1] + 1;
+            if (links.some(l => start < l.end && l.start < end)) return;
+            links.push({ start, end, ref });
+        });
+        links.sort((a, b) => a.start - b.start);
+
+        let cursor = 0;
+        links.forEach(link => {
+            if (link.start > cursor) {
+                fragment.appendChild(document.createTextNode(meaning.slice(cursor, link.start)));
+            }
+            fragment.appendChild(createRefLink(meaning.slice(link.start, link.end), link.ref));
+            cursor = link.end;
+        });
+        if (cursor < meaning.length) {
+            fragment.appendChild(document.createTextNode(meaning.slice(cursor)));
+        }
+    }
+
+    const missed = references.filter(ref => !links.some(l => l.ref === ref));
+    if (missed.length) {
+        const box = document.createElement('div');
+        box.className = 'word-refs';
+        box.append('См.: ');
+        missed.forEach((ref, i) => {
+            if (i) box.append('; ');
+            box.appendChild(createRefLink(ref.accent || ref.word, ref));
+        });
+        fragment.appendChild(box);
+    }
+
+    return fragment;
+}
+
+/**
+ * Нижний регистр без ударений (комбинируемый акут) — сопоставление слов
+ *
+ * @param {string} text - исходный текст
+ * @returns {string} нормализованный текст
+ */
+function normalizePlain(text) {
+    return (text || '').replace(/\u0301/g, '').toLowerCase();
+}
+
+/**
+ * Нормализация текста с картой индексов: нормализованный индекс -> исходный.
+ * Нужна, чтобы обернуть найденное слово оригинальным фрагментом текста
+ * (с ударениями, как в словаре).
+ *
+ * @param {string} text - исходный текст
+ * @returns {Object} {norm: string, map: number[]}
+ */
+function normalizeIndexes(text) {
+    const map = [];
+    let norm = '';
+    for (let i = 0; i < text.length; i++) {
+        if (text[i] === '\u0301') continue;
+        norm += text[i].toLowerCase();
+        map.push(i);
+    }
+    return { norm, map };
+}
+
+/**
+ * Кликабельная отсылка на другое слово: подстановка в строку поиска
+ * (тот же механизм, что клик по соседу в графе)
+ *
+ * @param {string} text - отображаемый текст ссылки
+ * @param {Object} ref - отсылка: word (поисковое), accent (для показа)
+ * @returns {Object} DOM-элемент ссылки
+ */
+function createRefLink(text, ref) {
+    const link = document.createElement('span');
+    link.className = 'word-ref';
+    link.textContent = text;
+    link.title = 'Перейти к слову';
+    link.addEventListener('click', function () {
+        $('#word').val(ref.word);
+        filterWords(getFilters(false));
+    });
+    return link;
+}
+
 /* 5.1 Граф понятий в карточке */
 /**
- * Разворачиваемый раздел графа понятий. Ленивая загрузка: граф запрашивается
- * только при первом раскрытии раздела.
+ * Разворачиваемый раздел графа понятий для одного значения. Ленивая загрузка:
+ * граф запрашивается только при первом раскрытии раздела.
  *
  * @param {string} word - лексема карточки
+ * @param {number} senseId - id значения (параметр необязательный для API)
  * @returns {Object} DOM-структура - раздел с кнопкой и контейнером графа
  */
-function createGraphSection(word) {
+function createGraphSection(word, senseId) {
     const section = document.createElement('div');
     section.className = 'word-graph';
 
@@ -300,7 +422,7 @@ function createGraphSection(word) {
         toggle.classList.toggle('active', opening);
         if (opening && !loaded) {
             loaded = true;
-            loadGraph(word, body);
+            loadGraph(word, senseId, body);
         }
     });
 
@@ -310,17 +432,18 @@ function createGraphSection(word) {
 }
 
 /**
- * Запрашивает граф понятий слова и передаёт контейнер в отрисовку
+ * Запрашивает граф понятий значения слова и передаёт контейнер в отрисовку
  *
  * @param {string} word - лексема карточки
+ * @param {number} senseId - id значения
  * @param {Object} container - DOM-контейнер под граф
  */
-function loadGraph(word, container) {
+function loadGraph(word, senseId, container) {
     container.textContent = 'Загрузка связей…';
     $.ajax({
         url: '/api/graph/',
         type: 'GET',
-        data: { word: word },
+        data: { word: word, sense_id: senseId },
         success: function (data) {
             try {
                 renderGraph(data, container);
@@ -589,12 +712,14 @@ function searchBySubcategory(name) {
 }
 
 /**
- * Формирует заголовок словарной статьи
+ * Формирует заголовок словарной статьи: лексема, формы в скобках
+ * (меньшим кеглем), грамматические характеристики
  *
  * @param {Object} word - Структура слова
  * @param {string} word.word - Слово (без ударения).
  * @param {string} word.accent - Слово с ударением.
  * @param {string} word.grammatical_features - часть речи слова
+ * @param {Object[]} word.forms[] - формы лексемы: form, accent
  * @param {string[]} word.subcategories[] - подкатегории слова
  */
 function createWordHeader(word) {
@@ -611,11 +736,19 @@ function createWordHeader(word) {
     const mainSpan = document.createElement('span');
     mainSpan.textContent = mainWord;
 
+    const forms = (word.forms || []).map(form => form.accent || form.form);
+    const formsSpan = document.createElement('span');
+    formsSpan.className = 'word-forms';
+    formsSpan.textContent = `(${forms.join('; ')})`;
+
     const subSpan = document.createElement('span');
     subSpan.className = 'word-subword';
     subSpan.textContent = `${subWord} ${escapeHtml(word.grammatical_features) || ''}`;
 
     wordDiv.appendChild(mainSpan);
+    if (forms.length) {
+        wordDiv.appendChild(formsSpan);
+    }
     wordDiv.appendChild(subSpan);
 
     const categoryDiv = document.createElement('div');
@@ -630,12 +763,13 @@ function createWordHeader(word) {
 
 /**
  * Формирует DOM-элементы словарных статей на основе полученных данных.
+ * Один элемент результата = одна статья (заголовок + блоки значений).
  *
  * @param {Object[]} words - Массив объектов слов от сервера.
  * @param {string} words[].word - Слово (без ударения).
  * @param {string} words[].accent - Слово с ударением.
- * @param {string} words[].meaning - Значение слова.
- * @param {Object[]} words[].examples - Массив примеров употребления.
+ * @param {Object[]} words[].senses - Значения лексемы.
+ * @param {Object[]} words[].forms - Формы лексемы.
  */
 function renderResults(words) {
     const container = document.getElementById('words');
@@ -646,56 +780,7 @@ function renderResults(words) {
         return;
     }
 
-    let lastWord = '';
-    let lastMeaning = '';
-    let currentArticle = null;
-
-    words.forEach(w => {
-        const parts = (w.accent || '').trim().split(/\s+/);
-        const mainWord = parts[0] || w.word;
-        const subWord = parts.slice(1).join(' ');
-
-        // Новая словарная статья
-        if (w.word !== lastWord) {
-
-            if (currentArticle) {
-                container.appendChild(currentArticle);
-            }
-
-            currentArticle = createWordArticle(w);
-            lastWord = w.word;
-            lastMeaning = ''; // Сбрасываем для нового слова
-
-        }
-        else if (w.meaning && w.meaning !== lastMeaning) {
-            const meaning = document.createElement('div');
-            meaning.className = 'word-meaning';
-            meaning.textContent = w.meaning;
-            currentArticle.appendChild(meaning);
-            lastMeaning = w.meaning;
-        }
-
-        else {
-            w.examples?.forEach(ex => {
-                if (ex.text?.trim()) {
-                    const example = document.createElement('div');
-                    example.className = 'word-example';
-                    example.textContent = ex.text;
-                    currentArticle.appendChild(example);
-                }
-                if (ex.region?.trim()) {
-                    const region = document.createElement('div');
-                    region.className = 'word-region';
-                    region.textContent = ex.region;
-                    currentArticle.appendChild(region);
-                }
-            });
-        }
-    });
-
-    if (currentArticle) {
-        container.appendChild(currentArticle);
-    }
+    words.forEach(w => container.appendChild(createWordArticle(w)));
 }
 
 /* 6. Пагинация */

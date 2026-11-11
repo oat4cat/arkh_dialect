@@ -1,19 +1,97 @@
 # core/views.py
 import json
+import re
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.core.paginator import Paginator
-from .filters import LexicalEntryFilter  
-from .models import Category, ConceptSense, LexicalEntry, Region, Sense, SenseSubcategory
+from .filters import LexicalEntryFilter
+from .models import (
+    Category, ConceptSense, LexicalEntry, Region, Sense, SenseSubcategory,
+)
 
 
 def _meanings(entry):
-    """Значения лексемы из связанных Sense."""
+    """Значения лексемы из связанных Sense (для попапов атласа)."""
     return "; ".join(
         sense.meaning
         for sense in entry.senses.all()
         if sense.meaning
     )
+
+
+def _plain(text):
+    """Текст без ударений, в нижнем регистре — для сопоставления слов."""
+    return re.sub(r"\u0301", "", text or "").lower()
+
+
+def _derivation_references(entry):
+    """Отношения производности, где лексема карточки — производная
+    (target): «уменьш. от воло́га» -> ссылка на волога (source)."""
+    return [
+        {
+            "type": rel.relation_type,
+            "word": rel.source_lexeme.word,
+            "accent": rel.source_lexeme.accent or "",
+            "sense_number": None,
+        }
+        for rel in entry.relations_to.all()
+    ]
+
+
+def _senses_payload(entry, selected_regions):
+    """Значения лексемы для карточки: примеры фильтруются по выбранным
+    районам, отсылки из SenseRelation/LexicalRelation цепляются к значению,
+    чьё толкование содержит целевое слово (иначе — к первому значению)."""
+    senses = sorted(entry.senses.all(), key=lambda s: s.sense_number or 0)
+
+    references = [
+        {
+            "type": rel.relation_type,
+            "word": rel.target_sense.lexical_entry.word,
+            "accent": rel.target_sense.lexical_entry.accent or "",
+            "sense_number": rel.target_sense.sense_number,
+        }
+        for sense in senses
+        for rel in sense.relations_from.all()
+    ]
+    for ref in _derivation_references(entry):
+        if ref not in references:
+            references.append(ref)
+
+    payload = []
+    seen_text_ids = set()
+    for sense in senses:
+        examples = []
+        for text_obj in sense.texts.all():
+            if text_obj.pk in seen_text_ids:
+                continue
+            region_name = text_obj.region.name if text_obj.region else None
+            if selected_regions and region_name not in selected_regions:
+                continue
+            seen_text_ids.add(text_obj.pk)
+            examples.append({"text": text_obj.text, "region": region_name})
+
+        payload.append({
+            "sense_id": sense.id,
+            "sense_number": sense.sense_number,
+            "meaning": sense.meaning or "",
+            "references": [],
+            "examples": examples,
+        })
+
+    # Привязка отсылок к значениям: ищем целевое слово в тексте толкования
+    for ref in references:
+        target = _plain(ref["word"])
+        placed = False
+        for sense, item in zip(senses, payload):
+            if target and target in _plain(sense.meaning):
+                item["references"].append(ref)
+                placed = True
+                break
+        if not placed and payload:
+            payload[0]["references"].append(ref)
+
+    return payload
 
 
 @require_POST
@@ -23,6 +101,8 @@ def search_api(request):
     qs = LexicalEntry.objects.prefetch_related(
         "senses__texts__region",
         "senses__subcategories",
+        "senses__relations_from__target_sense__lexical_entry",
+        "relations_to__source_lexeme",
         "lexical_forms",
     )
 
@@ -53,40 +133,26 @@ def search_api(request):
 
     results = []
     for entry in page_obj:
-        examples = []
         region_names = set()
-        seen_text_ids = set()
         subcategory_names = dict.fromkeys(
             subcategory.name
             for sense in entry.senses.all()
             for subcategory in sense.subcategories.all()
         )
 
-        for sense in entry.senses.all():
-            for text_obj in sense.texts.all():
-                if text_obj.pk in seen_text_ids:
-                    continue
+        senses = _senses_payload(entry, selected_regions)
 
-                region_name = text_obj.region.name if text_obj.region else None
-
-                if selected_regions and region_name not in selected_regions:
-                    continue
-
-                seen_text_ids.add(text_obj.pk)
-                examples.append({
-                    "text": text_obj.text,
-                    "region": region_name,
-                })
-                if region_name:
-                    region_names.add(region_name)
-
-        if selected_regions and not examples:
+        if selected_regions and not any(s["examples"] for s in senses):
             continue
+
+        for sense in senses:
+            for example in sense["examples"]:
+                if example["region"]:
+                    region_names.add(example["region"])
 
         results.append({
             "word": entry.word,
             "accent": entry.accent,
-            "meaning": _meanings(entry),
             "grammatical_features": entry.grammatical_features,
             "forms": [
                 {
@@ -98,7 +164,7 @@ def search_api(request):
             ],
             "subcategories": list(subcategory_names),
             "regions": list(region_names),
-            "examples": examples,
+            "senses": senses,
         })
 
     return JsonResponse({
@@ -232,6 +298,15 @@ def graph_api(request):
         .prefetch_related("subcategories")
         .order_by("sense_number")
     )
+
+    # Карточка держит раздел графа под каждым значением: sense_id сужает
+    # граф до одного толкования (необязательный параметр)
+    sense_id = request.GET.get("sense_id")
+    if sense_id:
+        try:
+            senses = [s for s in senses if s.id == int(sense_id)]
+        except ValueError:
+            pass
     own_sense_ids = {sense.id for sense in senses}
 
     # Неотклонённые связи толкований слова с неотклонёнными концептами
