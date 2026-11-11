@@ -185,6 +185,9 @@ def cluster_candidates(candidates, embeddings):
     порога — осознанный компромисс; замер методов:
     utils/кластеризация/сравнение_методов_кластеризации.md.
     Совпадающие леммы оказываются в одном кластере автоматически: их расстояние 0.
+    Вычисления в float32: разбиение идентично float64 (ARI 1.0000 на полном
+    корпусе), память под матрицы вдвое меньше. Профиль:
+    utils/кластеризация/память_и_производительность.md.
     """
     from scipy.cluster.hierarchy import fcluster, linkage
     from sklearn.feature_extraction.text import TfidfVectorizer
@@ -197,10 +200,10 @@ def cluster_candidates(candidates, embeddings):
     char_matrix = sk_normalize(
         TfidfVectorizer(analyzer="char", ngram_range=(2, 5), min_df=1)
         .fit_transform([c["lemma"] for c in candidates])
-    )
+    ).astype(np.float32)
 
     # Сжатая матрица расстояний для scipy linkage — блоками, без полной N x N.
-    dist = np.empty(n * (n - 1) // 2, dtype=np.float64)
+    dist = np.empty(n * (n - 1) // 2, dtype=np.float32)
     pos = 0
     for start in range(0, n, SIM_BLOCK):
         end = min(start + SIM_BLOCK, n)
