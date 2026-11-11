@@ -69,3 +69,23 @@ class ClusterCandidatesTests(SimpleTestCase):
 
         self.assertEqual(labels[0], labels[1])
         self.assertNotEqual(labels[0], labels[2])
+
+    def test_form_concepts_deduplicates_names(self):
+        """Одноимённые кластеры получают детерминированные суффиксы « (2)»."""
+        candidates = [
+            {"lemma": "aa", "surface": "aa", "upos": "NOUN",
+             "sense_id": 1, "syntactic_context": "aa"},
+            {"lemma": "bb", "surface": "bb", "upos": "NOUN",
+             "sense_id": 1, "syntactic_context": "bb"},
+            {"lemma": "aa", "surface": "aa", "upos": "NOUN",
+             "sense_id": 2, "syntactic_context": "aa"},
+            {"lemma": "cc", "surface": "cc", "upos": "NOUN",
+             "sense_id": 2, "syntactic_context": "cc"},
+        ]
+        embeddings = np.eye(4, dtype=np.float32)
+        labels = [10, 10, 20, 20]
+
+        concepts, links = concepts_pipeline.form_concepts(candidates, embeddings, labels)
+
+        self.assertEqual([c["name"] for c in concepts], ["aa", "aa (2)"])
+        self.assertEqual([l["name"] for l in links], ["aa", "aa (2)"])

@@ -221,14 +221,30 @@ def cluster_candidates(candidates, embeddings):
     return [int(label) for label in labels]
 
 
+def _unique_name(name, used_names):
+    """Детерминированное уникальное имя: «имя», «имя (2)», «имя (3)»…"""
+    taken = used_names.get(name, 0)
+    used_names[name] = taken + 1
+    if taken == 0:
+        return name
+    return f"{name} ({taken + 1})"
+
+
 def form_concepts(candidates, embeddings, labels):
-    """Кластеры → концепты (имя, формы, частота, centroid) и связи."""
+    """Кластеры → концепты (имя, формы, частота, centroid) и связи.
+
+    Имена концептов уникальны: при коллизии (два кластера с одним
+    каноническим именем) более поздний получает суффикс « (2)» и т.д.
+    Порядок кластеров детерминирован кластеризацией, имена воспроизводимы.
+    Инвариант опирается persist: дубль там — громкая ошибка, не слияние.
+    """
     groups = {}
     for idx, label in enumerate(labels):
         groups.setdefault(label, []).append(idx)
 
     concepts = []
     links = []
+    used_names = {}
     for indices in groups.values():
         lemmas = [candidates[i]["lemma"] for i in indices]
         pos_by_lemma = Counter(
@@ -239,6 +255,7 @@ def form_concepts(candidates, embeddings, labels):
             pos_by_lemma.items(),
             key=lambda kv: (POS_PRIORITY.get(kv[0][1], 10), -kv[1]),
         )
+        name = _unique_name(name, used_names)
         centroid = embeddings[indices].mean(axis=0)
         centroid /= np.linalg.norm(centroid) or 1.0
 
@@ -273,7 +290,12 @@ def _merge_status(current, new):
 
 @transaction.atomic
 def persist(concepts, links):
-    """Перезапись таблиц с переносом статусов модерации по имени концепта."""
+    """Перезапись таблиц с переносом статусов модерации по имени концепта.
+
+    Имена концептов обязаны быть уникальны (инвариант form_concepts) —
+    перенос статусов и связей по имени некорректен при дублях.
+    bulk_create возвращает PK (SQLite ≥ 3.35, Django can_return_rows_from_bulk_insert).
+    """
     old_status = {}
     for name, status in Concept.objects.values_list("name", "status"):
         old_status[name] = _merge_status(old_status.get(name), status)
@@ -288,17 +310,23 @@ def persist(concepts, links):
     ConceptSense.objects.all().delete()
     Concept.objects.all().delete()
 
-    # Одноимённые кластеры маловероятны; при коллизии связи уходят к первому.
-    id_by_name = {}
-    for concept in concepts:
-        obj = Concept.objects.create(
-            name=concept["name"],
-            frequency=concept["frequency"],
-            forms=json.dumps(concept["forms"], ensure_ascii=False),
-            status=old_status.get(concept["name"], "unchecked"),
-            centroid_embedding=concept["centroid"].tobytes(),
-        )
-        id_by_name.setdefault(concept["name"], obj.id)
+    if len({c["name"] for c in concepts}) != len(concepts):
+        raise ValueError("Одноимённые концепты: нарушен инвариант form_concepts")
+
+    created = Concept.objects.bulk_create(
+        [
+            Concept(
+                name=concept["name"],
+                frequency=concept["frequency"],
+                forms=json.dumps(concept["forms"], ensure_ascii=False),
+                status=old_status.get(concept["name"], "unchecked"),
+                centroid_embedding=concept["centroid"].tobytes(),
+            )
+            for concept in concepts
+        ],
+        batch_size=500,
+    )
+    id_by_name = {obj.name: obj.id for obj in created}
 
     ConceptSense.objects.bulk_create([
         ConceptSense(
