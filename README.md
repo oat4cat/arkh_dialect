@@ -22,3 +22,20 @@
     - частям речи
 - Лексический атлас
 
+## Скрипты
+
+Пайплайн наполнения словаря — папка `scripts/` 
+
+- `scripts/parse_dictionary.py` — парсер тома словаря: сырой текст → `json` (рубрики → леммы → грамматика → значения → примеры по районам → производные формы и перекрёстные ссылки). Пути задаются аргументами:
+  ```bash
+  venv/Scripts/python -X utf8 scripts/parse_dictionary.py [dicN_raw.txt] [parsed_dictionary_N.json]
+  ```
+ В конце печатает сводку и подозрительные строки для ручной проверки.
+- `scripts/migrate_to_db.py` — заливает `json` в `dialect.db` 
+  ```bash
+  venv/Scripts/python -X utf8 scripts/migrate_to_db.py [parsed_dictionary_N.json]
+  ```
+- `scripts/create_concept_tables.py` — создаёт таблицы графа понятий `Concept`/`Concept_Sense` в `dialect.db`.
+
+Пересборка графа понятий после перезаливки словаря: `venv/Scripts/python manage.py build_concepts`.
+
