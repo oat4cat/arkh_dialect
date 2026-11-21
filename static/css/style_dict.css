@@ -735,6 +735,24 @@ body {
     font-size: 15px;
 }
 
+.word-graph-controls {
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #002C5B;
+}
+
+.word-graph-limit {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.word-graph-limit-slider {
+    width: 160px;
+    accent-color: #002C5B;
+    cursor: pointer;
+}
+
 .word-graph-canvas {
     height: 380px;
     border: 0.5px solid rgba(0, 44, 91, 0.2);

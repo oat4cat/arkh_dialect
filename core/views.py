@@ -1,12 +1,14 @@
 # core/views.py
 import json
 import re
+from collections import Counter
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.core.paginator import Paginator
 from .filters import LexicalEntryFilter
 from .models import (
-    Category, ConceptSense, LexicalEntry, Region, Sense, SenseSubcategory,
+    Category, ConceptSense, LexicalEntry, Region, Sense, SenseRelation,
+    SenseSubcategory,
 )
 
 
@@ -246,14 +248,21 @@ def _subcategory_names(sense):
     return [subcategory.name for subcategory in sense.subcategories.all()]
 
 
-# Сколько соседей показывать на один концепт в карточке. Хабы вроде «тест»
-# собирают 1000+ членов; без лимита JSON раздувается до сотен килобайт.
-# Остальные связи никуда не деваются — в БД хранятся все, это ограничение
-# только отображения (полный список открывается отдельно, позже).
+# Сколько соседей показывать на один концепт в карточке по умолчанию.
+# Хабы собирают 1000+ членов; без лимита JSON раздувается до сотен килобайт.
+# Остальные связи никуда не деваются — в БД хранятся все, лимит поднимается
+# параметром limit (ползунок в карточке).
 MAX_NEIGHBORS_PER_CONCEPT = 5
+# Жёсткий потолок «соседей на понятие» для ползунка. Конфиг, не метрика:
+# значение — 95-й процентиль размеров кластеров на корпусе 3-го тома.
+# Медиана (2) и среднее (7.4) слишком малы для потолка (utils/кластеризация/
+# метрики_кластеризации.html); p95 ≈ 28 покрывает полностью 95% кластеров
+# и обрезает только хвост хабов. После пересборки концептов (build_concepts)
+# пересчитать: sorted(Concept.frequency)[int(N * 0.95)].
+MAX_NEIGHBORS_HARD_CAP = 28
 
 
-def _neighbor_payload(sense, link, subcategories):
+def _neighbor_payload(sense, link, subcategories, shared_concepts, is_equivalent):
     """Соседнее толкование (чужой лексемы) для узла графа."""
     return {
         "word": sense.lexical_entry.word,
@@ -262,25 +271,33 @@ def _neighbor_payload(sense, link, subcategories):
         "meaning": sense.meaning or "",
         "status": link.status,
         "subcategories": subcategories,
+        # Близость к слову-корню: общие концепты весят больше, эквивалентность
+        # («то же, что») выступает tie-break выше алфавита.
+        "score": shared_concepts * 2 + (1 if is_equivalent else 0),
     }
 
 
-def _concept_payload(concept, member_links, senses_by_id, subcats_by_sense, own_sense_ids):
-    """Концепт и топ его чужих толкований для карточки (с полным числом)."""
+def _concept_payload(concept, member_links, senses_by_id, subcats_by_sense,
+                     own_sense_ids, shared_by_sense, equivalent_ids, limit):
+    """Концепт и топ его чужих толкований для карточки (с полным числом).
+
+    Топ выбирается по близости к слову-корню (см. score), размер — limit."""
     neighbors = [
         _neighbor_payload(
             senses_by_id[link.sense_id], link,
             subcats_by_sense.get(link.sense_id, []),
+            shared_by_sense.get(link.sense_id, 0),
+            link.sense_id in equivalent_ids,
         )
         for link in member_links
         if link.sense_id not in own_sense_ids
     ]
-    neighbors.sort(key=lambda n: (n["word"], n["sense_id"]))
+    neighbors.sort(key=lambda n: (-n["score"], n["word"], n["sense_id"]))
     return {
         "concept_id": concept.id,
         "name": concept.name,
         "status": concept.status,
-        "neighbors": neighbors[:MAX_NEIGHBORS_PER_CONCEPT],
+        "neighbors": neighbors[:limit],
         "neighbors_total": len(neighbors),
     }
 
@@ -309,6 +326,16 @@ def graph_api(request):
             pass
     own_sense_ids = {sense.id for sense in senses}
 
+    # Сколько соседей показывать на концепт (ползунок в карточке);
+    # без параметра — дефолт, сверху — конфиг-потолок.
+    limit = MAX_NEIGHBORS_PER_CONCEPT
+    raw_limit = request.GET.get("limit")
+    if raw_limit:
+        try:
+            limit = max(1, min(int(raw_limit), MAX_NEIGHBORS_HARD_CAP))
+        except ValueError:
+            pass
+
     # Неотклонённые связи толкований слова с неотклонёнными концептами
     own_links = list(
         ConceptSense.objects
@@ -335,11 +362,8 @@ def graph_api(request):
             .filter(concept_id__in=concept_ids)
             .values("sense_id")
         )
-        member_links = list(
-            ConceptSense.objects
-            .filter(concept_id__in=concept_ids)
-            .exclude(status="rejected")
-        )
+        member_links_qs = ConceptSense.objects.filter(concept_id__in=concept_ids)
+        member_links = list(member_links_qs.exclude(status="rejected"))
         senses_by_id = {
             sense.id: sense
             for sense in member_senses_qs.select_related("lexical_entry")
@@ -356,6 +380,28 @@ def graph_api(request):
         for link in member_links:
             members_by_concept.setdefault(link.concept_id, []).append(link)
 
+        # Близость соседа к слову-корню: сколько концептов графа разделяет
+        # его толкование с толкованиями слова.
+        shared_by_sense = Counter(link.sense_id for link in member_links)
+
+        # Словарная эквивалентность («то же, что») в любую сторону —
+        # самая сильная связь соседа со словом.
+        own_ids = list(own_sense_ids)
+        member_ids_subquery = member_links_qs.values("sense_id")
+        equivalent_ids = set(
+            SenseRelation.objects.filter(
+                source_sense_id__in=own_ids,
+                target_sense_id__in=member_ids_subquery,
+                relation_type="dictionary_equivalent",
+            ).values_list("target_sense_id", flat=True)
+        ) | set(
+            SenseRelation.objects.filter(
+                source_sense_id__in=member_ids_subquery,
+                target_sense_id__in=own_ids,
+                relation_type="dictionary_equivalent",
+            ).values_list("source_sense_id", flat=True)
+        )
+
         for sense in senses:
             concepts = concepts_by_sense.get(sense.id, [])
             if not concepts:
@@ -368,9 +414,16 @@ def graph_api(request):
                     _concept_payload(
                         concept, members_by_concept.get(concept.id, []),
                         senses_by_id, subcats_by_sense, own_sense_ids,
+                        shared_by_sense, equivalent_ids, limit,
                     )
                     for concept in concepts
                 ],
             })
 
-    return JsonResponse({"word": word, "senses": payload})
+    return JsonResponse({
+        "word": word,
+        "senses": payload,
+        "sense_id": int(sense_id) if sense_id and sense_id.isdigit() else None,
+        "limit": limit,
+        "max_limit": MAX_NEIGHBORS_HARD_CAP,
+    })

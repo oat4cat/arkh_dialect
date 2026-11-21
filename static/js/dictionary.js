@@ -439,13 +439,16 @@ function createGraphSection(word, senseId) {
  * @param {string} word - лексема карточки
  * @param {number} senseId - id значения
  * @param {Object} container - DOM-контейнер под граф
+ * @param {number} [limit] - сколько соседей показывать на концепт (ползунок)
  */
-function loadGraph(word, senseId, container) {
+function loadGraph(word, senseId, container, limit) {
     container.textContent = 'Загрузка связей…';
+    const params = { word: word, sense_id: senseId };
+    if (limit) params.limit = limit;
     $.ajax({
         url: '/api/graph/',
         type: 'GET',
-        data: { word: word, sense_id: senseId },
+        data: params,
         success: function (data) {
             try {
                 renderGraph(data, container);
@@ -462,9 +465,10 @@ function loadGraph(word, senseId, container) {
 /**
  * Отрисовывает граф понятий через Cytoscape.js. Начальный вид: слово → его
  * концепты (с числом соседей); соседние лексемы скрыты под концептами —
- * клик по концепту разворачивает/сворачивает его топ-N (полный список
- * живёт в БД). Клик по лексеме-соседу — поиск слова; чипы подкатегорий
- * под графом — поиск по подкатегории; непроверенные узлы — пунктир.
+ * клик по концепту разворачивает/сворачивает его топ-N (N — ползунком сверху,
+ * лимит только отображения: в БД хранятся все связи). Клик по лексеме-соседу —
+ * поиск слова; чипы подкатегорий под графом — поиск по подкатегории;
+ * непроверенные узлы — пунктир.
  *
  * @param {Object} data - ответ /api/graph/
  * @param {Object} container - DOM-контейнер под граф
@@ -477,6 +481,13 @@ function renderGraph(data, container) {
     }
 
     container.innerHTML = `
+        <div class="word-graph-controls">
+            <label class="word-graph-limit">
+                Соседей на понятие: <span class="word-graph-limit-value">${data.limit}</span>
+                <input type="range" class="word-graph-limit-slider"
+                       min="1" max="${data.max_limit}" step="1" value="${data.limit}">
+            </label>
+        </div>
         <div class="word-graph-canvas"></div>
         <div class="word-graph-subcats"></div>
         <div class="word-graph-tooltip" style="display: none;"></div>
@@ -484,6 +495,17 @@ function renderGraph(data, container) {
     const canvas = container.querySelector('.word-graph-canvas');
     const tooltip = container.querySelector('.word-graph-tooltip');
     const subcatsBox = container.querySelector('.word-graph-subcats');
+
+    // Ползунок: живое обновление подписи, перезапрос — после отпускания
+    // (сдвиг лимита перестраивает граф, развёрнутые концепты сворачиваются)
+    const slider = container.querySelector('.word-graph-limit-slider');
+    const limitValue = container.querySelector('.word-graph-limit-value');
+    slider.addEventListener('input', function () {
+        limitValue.textContent = this.value;
+    });
+    slider.addEventListener('change', function () {
+        loadGraph(data.word, data.sense_id, container, parseInt(this.value, 10));
+    });
 
     const rootId = `w:${data.word}`;
     const concepts = new Map();  // concept_id -> концепт с топ-N соседями
