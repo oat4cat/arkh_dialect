@@ -10,6 +10,7 @@ from .models import (
     Category, ConceptSense, LexicalEntry, Region, Sense, SenseRelation,
     SenseSubcategory,
 )
+from .semantic import ensure_warm, semantic_search, status as semantic_status
 
 
 def _meanings(entry):
@@ -96,6 +97,45 @@ def _senses_payload(entry, selected_regions):
     return payload
 
 
+def _entry_payload(entry, selected_regions):
+    """Карточка лексемы для JSON-ответа (контракт фронта: createWordArticle).
+
+    Возвращает None, если выбранные районы отсекли все примеры значений."""
+    region_names = set()
+    subcategory_names = dict.fromkeys(
+        subcategory.name
+        for sense in entry.senses.all()
+        for subcategory in sense.subcategories.all()
+    )
+
+    senses = _senses_payload(entry, selected_regions)
+
+    if selected_regions and not any(s["examples"] for s in senses):
+        return None
+
+    for sense in senses:
+        for example in sense["examples"]:
+            if example["region"]:
+                region_names.add(example["region"])
+
+    return {
+        "word": entry.word,
+        "accent": entry.accent,
+        "grammatical_features": entry.grammatical_features,
+        "forms": [
+            {
+                "form": form.form,
+                "accent": form.accent,
+                "grammatical_features": form.grammatical_features,
+            }
+            for form in entry.lexical_forms.all()
+        ],
+        "subcategories": list(subcategory_names),
+        "regions": list(region_names),
+        "senses": senses,
+    }
+
+
 @require_POST
 def search_api(request):
     data = json.loads(request.body)
@@ -128,54 +168,152 @@ def search_api(request):
         3: "-senses__subcategories__name",
     }
     filtered_qs = filtered_qs.order_by(order_map.get(order, "word")).distinct()
+    selected_regions = set(data.get("regions", []))
+    word_query = (data.get("word") or "").strip()
+
+    # Режим «поиск по смыслу» (переключатель на странице): точные совпадения
+    # первыми, за ними семантика. Без слова режим не включается — семантике
+    # нечего эмбеддить, остаётся обычный обзор с фильтрами.
+    if data.get("use_semantic") and word_query:
+        return _semantic_mode_response(filtered_qs, data, word_query, selected_regions)
 
     paginator = Paginator(filtered_qs, 20)
     page_obj = paginator.get_page(int(data.get("page", 1)))
-    selected_regions = set(data.get("regions", []))
 
     results = []
     for entry in page_obj:
-        region_names = set()
-        subcategory_names = dict.fromkeys(
-            subcategory.name
-            for sense in entry.senses.all()
-            for subcategory in sense.subcategories.all()
-        )
+        payload = _entry_payload(entry, selected_regions)
+        if payload is not None:
+            results.append(payload)
 
-        senses = _senses_payload(entry, selected_regions)
-
-        if selected_regions and not any(s["examples"] for s in senses):
-            continue
-
-        for sense in senses:
-            for example in sense["examples"]:
-                if example["region"]:
-                    region_names.add(example["region"])
-
-        results.append({
-            "word": entry.word,
-            "accent": entry.accent,
-            "grammatical_features": entry.grammatical_features,
-            "forms": [
-                {
-                    "form": form.form,
-                    "accent": form.accent,
-                    "grammatical_features": form.grammatical_features,
-                }
-                for form in entry.lexical_forms.all()
-            ],
-            "subcategories": list(subcategory_names),
-            "regions": list(region_names),
-            "senses": senses,
-        })
+    # Авто-fallback, когда переключатель выключен: точный поиск пуст и задано
+    # только слово (с фильтрами не подмешиваем — иначе неотфильтрованный
+    # векторный результат нельзя было бы отличить от отфильтрованного точного).
+    # Хиты Qdrant джойнятся обратно к SQLite — источнику истины.
+    semantic = False
+    if (
+        not results
+        and word_query
+        and not data.get("subcategories")
+        and not selected_regions
+        and not data.get("pos")
+    ):
+        try:
+            hits = semantic_search(word_query)
+        except Exception:
+            hits = None  # семантика не должна ронять точный поиск
+        if hits:
+            results = _semantic_results(hits)
+            semantic = bool(results)
 
     return JsonResponse({
         "results": results,
+        "semantic": semantic,
         "has_next": page_obj.has_next(),
         "has_prev": page_obj.has_previous(),
         "current_page": page_obj.number,
         "total_pages": paginator.num_pages,
     })
+
+
+# Сколько лексем показываем на семантический запрос: как страница точного
+# поиска (Paginator там по 20). Пагинации у fallback-режима нет — точный
+# поиск пуст, листать нечего.
+SEMANTIC_RESULT_LIMIT = 20
+
+
+def _semantic_results(hits, limit=SEMANTIC_RESULT_LIMIT, exclude_entry_ids=frozenset()):
+    """Карточки для семантических совпадений.
+
+    Векторный поиск возвращает толкования; лексемы выводятся по одному разу
+    в порядке лучшего хита (одна лексема может дать несколько хитов — её
+    разные значения). exclude_entry_ids — уже выведенные точной частью
+    (режим «поиск по смыслу»), повторять их не нужно. Данные карточек —
+    из SQLite, как у точного поиска."""
+    senses = (
+        Sense.objects
+        .filter(id__in=[hit["sense_id"] for hit in hits])
+        .select_related("lexical_entry")
+    )
+    senses_by_id = {sense.id: sense for sense in senses}
+
+    entry_order = []
+    seen = set()
+    for hit in hits:
+        sense = senses_by_id.get(hit["sense_id"])
+        if (
+            not sense
+            or sense.lexical_entry_id in seen
+            or sense.lexical_entry_id in exclude_entry_ids
+        ):
+            continue
+        seen.add(sense.lexical_entry_id)
+        entry_order.append(sense.lexical_entry_id)
+
+    entries = LexicalEntry.objects.filter(id__in=entry_order).prefetch_related(
+        "senses__texts__region",
+        "senses__subcategories",
+        "senses__relations_from__target_sense__lexical_entry",
+        "relations_to__source_lexeme",
+        "lexical_forms",
+    )
+    entries_by_id = {entry.id: entry for entry in entries}
+
+    results = []
+    for entry_id in entry_order[:limit]:
+        entry = entries_by_id.get(entry_id)
+        if entry:
+            results.append(_entry_payload(entry, set()))
+    return results
+
+
+def _semantic_mode_response(filtered_qs, data, word_query, selected_regions):
+    """Ответ режима «поиск по смыслу»: точные совпадения словоформы первыми
+    (обычный поиск с фильтрами, без пагинации), за ними семантические хиты.
+    Фильтры уходят в Qdrant как предфильтрация: ранжирование считается только
+    по карточкам, прошедшим фильтры, а не «топ-20, потом выкинуть лишнее».
+    Одна страница, пагинации нет."""
+    exact_results = []
+    exact_ids = set()
+    for entry in filtered_qs[:SEMANTIC_RESULT_LIMIT]:
+        payload = _entry_payload(entry, selected_regions)
+        if payload is not None:
+            exact_results.append(payload)
+            exact_ids.add(entry.pk)
+
+    sem_results = []
+    try:
+        hits = semantic_search(
+            word_query,
+            filters={
+                "subcategories": data.get("subcategories", []),
+                "regions": list(selected_regions),
+                "pos": data.get("pos", []),
+            },
+        )
+        if hits:
+            sem_results = _semantic_results(hits, exclude_entry_ids=exact_ids)
+    except Exception:
+        pass  # семантика не должна ронять точный поиск
+
+    return JsonResponse({
+        "results": exact_results + sem_results,
+        "semantic": True,
+        "semantic_exact": len(exact_results),
+        "has_next": False,
+        "has_prev": False,
+        "current_page": 1,
+        "total_pages": 1,
+    })
+
+
+@require_GET
+def semantic_status_api(request):
+    """Статус семантического поиска для фронта: индекс собран, модель
+    прогрета. Холодную модель греет фоново — к первому запросу пользователя
+    загрузка уже идёт или завершена."""
+    ensure_warm()
+    return JsonResponse(semantic_status())
 
 
 @require_GET

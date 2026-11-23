@@ -186,7 +186,8 @@ function getFilters(page_chosen, page_num = 1) {
         regions: $('#selected-items-region .selected-item').map(function () { return $(this).attr('data'); }).get(),
         pos: $('#selected-items-pos .selected-item').map(function () { return $(this).attr('data'); }).get(),
         page: page_chosen ? parseInt($('.page-item.active').data('page')) || 1 : page_num,
-        order: order
+        order: order,
+        use_semantic: $('#semantic-toggle').is(':checked')
     };
 }
 
@@ -209,12 +210,60 @@ function filterWords(filters) {
         contentType: 'application/json',
         data: JSON.stringify(filters),
         success: function (response) {
-            renderResults(response.results);
+            renderResults(response.results, response);
             renderPagination(response);
+            if (response.semantic) {
+                // семантика отработала — модель точно прогрета
+                semanticState.warm = true;
+                refreshSemanticWarmNote();
+            }
         },
         error: function (err) {
             console.error('Ошибка запроса:', err);
             $('#words').html('<p style="color:red; padding: 20px;">Ошибка загрузки данных. Проверьте консоль разработчика.</p>');
+        }
+    });
+}
+
+/* Статус семантического поиска (индекс собран / модель прогрета) — кэш
+   от /api/semantic/status/. Первый запуск модели на сервере — до ~1 минуты
+   (загрузка весов, не сеть): статус-эндпоинт греет её фоном уже при открытии
+   страницы, а пока модель холодная и в строке поиска есть слово (сработает
+   авто-fallback или включённый режим по смыслу), заметка говорит, что система
+   не зависла, а думает. */
+let semanticState = { available: false, warm: false };
+let semanticWarmTimer = null;
+
+function refreshSemanticWarmNote() {
+    const note = $('#semantic-warm-note');
+    if (!semanticState.available) {
+        note.text('Поиск по смыслу сейчас недоступен: векторный индекс не собран. Точный поиск работает как обычно.');
+        note.show();
+        return;
+    }
+    const wordEntered = $('#word').val().trim().length > 0;
+    if (!semanticState.warm && wordEntered) {
+        note.text('Загружается модель поиска по смыслу — первый запрос может занять до ~1 минуты, дальше мгновенно. Система думает, а не зависла.');
+        note.show();
+    } else {
+        note.hide();
+    }
+}
+
+function checkSemanticWarm() {
+    $.ajax({
+        url: '/api/semantic/status/',
+        type: 'GET',
+        success: function (status) {
+            semanticState = status;
+            if (!status.warm && !semanticWarmTimer) {
+                semanticWarmTimer = setInterval(checkSemanticWarm, 3000);
+            }
+            if (status.warm && semanticWarmTimer) {
+                clearInterval(semanticWarmTimer);
+                semanticWarmTimer = null;
+            }
+            refreshSemanticWarmNote();
         }
     });
 }
@@ -801,14 +850,22 @@ function createWordHeader(word) {
  * Один элемент результата = одна статья (заголовок + блоки значений).
  *
  * @param {Object[]} words - Массив объектов слов от сервера.
- * @param {string} words[].word - Слово (без ударения).
- * @param {string} words[].accent - Слово с ударением.
- * @param {Object[]} words[].senses - Значения лексемы.
- * @param {Object[]} words[].forms - Формы лексемы.
+ * @param {Object} response - Ответ /api/search/: semantic (ответ поиска по
+ *                            смыслу) и semantic_exact (сколько точных
+ *                            совпадений в начале выдачи).
  */
-function renderResults(words) {
+function renderResults(words, response) {
     const container = document.getElementById('words');
     container.innerHTML = '';
+
+    if (response.semantic && words && words.length) {
+        const note = document.createElement('p');
+        note.className = 'semantic-note';
+        note.textContent = response.semantic_exact > 0
+            ? `Точных совпадений: ${response.semantic_exact}. Ниже — и близкие по смыслу.`
+            : 'Точных совпадений не найдено. Показаны слова, близкие по смыслу.';
+        container.appendChild(note);
+    }
 
     if (!words || words.length === 0) {
         container.innerHTML = '<p style="padding: 20px;">Ничего не найдено. Попробуйте другой запрос.</p>';
@@ -939,6 +996,21 @@ $(document).ready(function () {
             filterWords(getFilters(false));
         }
     });
+
+    // Переключатель «всегда искать по смыслу»: прогрев модели при включении,
+    // перезапуск поиска в новом режиме
+    $('#semantic-toggle').change(function () {
+        if (this.checked) {
+            checkSemanticWarm();
+        }
+        refreshSemanticWarmNote();
+        filterWords(getFilters(false));
+    });
+
+    // Семантика: греем модель фоном ещё до первого запроса, заметку о
+    // прогреве обновляем по мере ввода слова
+    checkSemanticWarm();
+    $('#word').on('input', refreshSemanticWarmNote);
 
     // Первая загрузка при открытии страницы: слова грузятся сразу, инструкция остаётся видна
     filterWords(getFilters(false));

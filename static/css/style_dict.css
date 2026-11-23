@@ -831,3 +831,37 @@ body {
     margin-top: 4px;
     font-size: 90%;
 }
+
+/* Плашка семантических результатов: точный поиск пуст, сервер подтянул
+   близкие по смыслу слова (флаг semantic в ответе /api/search/) */
+.semantic-note {
+    padding: 10px 14px;
+    margin: 0 0 12px;
+    background: #ECEFF6;
+    border-left: 3px solid #002C5B;
+    color: #002C5B;
+    font-style: italic;
+}
+
+/* Переключатель «всегда искать по смыслу» (отдельная строка под кнопками
+   поиска) и предупреждение о прогреве модели */
+.semantic-controls {
+    margin-top: 10px;
+}
+
+.semantic-toggle {
+    font-size: 95%;
+    cursor: pointer;
+}
+
+.semantic-toggle input {
+    vertical-align: middle;
+    margin-right: 5px;
+}
+
+.semantic-warm-note {
+    margin: 8px 0 0;
+    font-size: 90%;
+    font-style: italic;
+    color: #8a5a00;
+}

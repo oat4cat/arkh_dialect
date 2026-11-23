@@ -53,5 +53,13 @@ dialect.db
 todo.md
 parsed_dictionary.json
 
+# Векторное хранилище семантического поиска (производное, пересобирается
+# utils/build_semantic_index.py — как dialect.db, не коммитить)
+qdrant_storage/
+
+# Локальная копия эмбеддинг-модели (e5-small, ~470 МБ, из HF Hub —
+# не коммитить)
+models/
+
 # конфиг админа
 fixtures/superuser.json
