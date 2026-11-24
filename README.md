@@ -33,13 +33,23 @@
   venv/Scripts/python -X utf8 scripts/parse_dictionary.py [dicN_raw.txt] [parsed_dictionary_N.json]
   ```
  В конце печатает сводку и подозрительные строки для ручной проверки.
-- `scripts/migrate_to_db.py` — заливает `json` в `dialect.db` 
+- `scripts/migrate_to_db.py` — заливает `json` в подготовленную `dialect.db`
   ```bash
   venv/Scripts/python -X utf8 scripts/migrate_to_db.py [parsed_dictionary_N.json]
   ```
+  Скрипт дописывает записи и не очищает старые данные, поэтому перед повторной
+  перезаливкой используйте чистую копию базы со справочниками `Region` и
+  `Subcategory`.
 - `scripts/create_concept_tables.py` — создаёт таблицы графа понятий `Concept`/`Concept_Sense` в `dialect.db`.
 
-Пересборка графа понятий после перезаливки словаря: `venv/Scripts/python manage.py build_concepts`.
+Полный пересчёт после перезаливки словаря:
+```bash
+venv/Scripts/python scripts/create_concept_tables.py
+venv/Scripts/python manage.py build_concepts
+venv/Scripts/python -X utf8 utils/build_semantic_index.py
+```
+Индекс семантического поиска зависит от концептов, поэтому его надо собирать
+после `build_concepts`.
 
 
 /qdrant_storage - директория векторного хранилища,

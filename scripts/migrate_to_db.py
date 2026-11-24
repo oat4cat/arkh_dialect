@@ -20,6 +20,15 @@ logging.basicConfig(
 
 # Токены региона в тексте словаря -> имена Region в БД (ключи — после remove_accents, т.е. lowercased)
 REGION_ALIASES = {
+    'нао.': 'Ненец. авт. округ',
+    'ненец. ао': 'Ненец. авт. округ',
+    'ненец. авт. окр.': 'Ненец. авт. округ',
+    'ненец. авт. округ.': 'Ненец. авт. округ',
+    'ненец. автономный округ.': 'Ненец. авт. округ',
+    'ненецкий ао.': 'Ненец. авт. округ',
+    'ненецкий авт. окр.': 'Ненец. авт. округ',
+    'ненецкий авт. округ.': 'Ненец. авт. округ',
+    'ненецкий автономный округ.': 'Ненец. авт. округ',
     'шенкур.': 'шенк.',
 }
 
@@ -51,7 +60,8 @@ def resolve_region_id(region_raw, region_map):
     if not region_raw:
         return None
     clean = remove_accents(region_raw)
-    clean = REGION_ALIASES.get(clean, clean)
+    alias = REGION_ALIASES.get(clean, clean)
+    clean = remove_accents(alias)
     return region_map.get(clean)
 
 def derive_pos(gram: str) -> str:
@@ -209,6 +219,12 @@ def migrate_data():
                     # 5. Text и Sense_Text (Примеры)
                     for ex in sense_data.get("examples", []):
                         region_id = resolve_region_id(ex.get("region"), region_map)
+                        if ex.get("region") and region_id is None:
+                            logging.warning(
+                                f"Регион '{ex['region']}' у слова '{entry_data['word']}' "
+                                "не найден в Region; пример сохранён без региона."
+                            )
+                            stats["warnings"] += 1
 
                         cursor.execute("""
                             INSERT INTO Text (text, region) VALUES (?, ?)
@@ -284,6 +300,13 @@ def migrate_data():
 
                         for ex in derived_sense.get("examples", []):
                             region_id = resolve_region_id(ex.get("region"), region_map)
+                            if ex.get("region") and region_id is None:
+                                logging.warning(
+                                    f"Регион '{ex['region']}' у производного "
+                                    f"'{derived['word']}' не найден в Region; "
+                                    "пример сохранён без региона."
+                                )
+                                stats["warnings"] += 1
 
                             cursor.execute("""
                                 INSERT INTO Text (text, region) VALUES (?, ?)

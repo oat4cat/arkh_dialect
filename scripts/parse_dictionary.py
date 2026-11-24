@@ -22,13 +22,39 @@ DEFAULT_OUTPUT = ROOT / "utils" / "парсинг словаря" / "parsed_dict
 
 KNOWN_REGIONS = {'Вельск.', 'Верхнетоем.', 'Вилег.', 'Виногр.', 'Каргоп.',
                  'Кенозеро', 'Конош.', 'Котлас.', 'Красноб.', 'Ленск.',
-                 'Лешук.', 'Мезен.', 'Няндом.', 'НАО.', 'Онеж.', 'Пинеж.', 'Плесец.',
+                 'Лешук.', 'Мезен.', 'Няндом.', 'Онеж.', 'Пинеж.', 'Плесец.',
                  'Примор.', 'Устьян.', 'Холмог.', 'Шенк.', 'Шенкур.'}
 
+NAO_REGION = 'Ненец. авт. округ'
+REGION_ALIASES = {
+    'НАО': NAO_REGION,
+    'Ненец. АО': NAO_REGION,
+    'Ненец. авт. окр': NAO_REGION,
+    'Ненец. авт. округ': NAO_REGION,
+    'Ненец. автономный округ': NAO_REGION,
+    'Ненецкий АО': NAO_REGION,
+    'Ненецкий авт. окр': NAO_REGION,
+    'Ненецкий авт. округ': NAO_REGION,
+    'Ненецкий автономный округ': NAO_REGION,
+}
+
 # Токен региона в конце строки (для производных форм после вырезания примера)
-sorted_regions = sorted(KNOWN_REGIONS, key=len, reverse=True)
+REGION_SPELLINGS = KNOWN_REGIONS | set(REGION_ALIASES)
+sorted_regions = sorted(REGION_SPELLINGS, key=len, reverse=True)
 escaped_regions = [re.escape(r) for r in sorted_regions]
-region_pattern = re.compile(r'(' + '|'.join(escaped_regions) + r')(?:\s*[;,.]?)?\s*$')
+region_pattern = re.compile(
+    r'(?<![А-ЯЁа-яё])(' + '|'.join(escaped_regions) + r')(?:\s*[,.])?\s*;?\s*$',
+    re.IGNORECASE,
+)
+
+
+def canonical_region(region: str) -> str:
+    """Все варианты написания региона -> каноническое имя из БД."""
+    matching_alias = next(
+        (alias for alias in REGION_ALIASES if alias.casefold() == region.casefold()),
+        None,
+    )
+    return REGION_ALIASES[matching_alias] if matching_alias else region
 
 # Грамматические аббревиатуры: точку после них нельзя считать концом предложения
 # («…мн., в знач. сущ. – Тонкие пироги…»). «В сочетании.» — НЕ аббревиатура.
@@ -107,6 +133,11 @@ def normalize_accents(text: str) -> str:
     return text
 
 
+def normalize_punctuation(text: str) -> str:
+    """Схлопнуть дублирующиеся точки, появившиеся после подстановки «//»."""
+    return re.sub(r'\.{2,}', '.', text)
+
+
 def remove_accents(text: str) -> str:
     """Убрать все акценты, результат в нижнем регистре."""
     text = re.sub(r'\u0301', '', text)
@@ -121,19 +152,25 @@ def parse_examples(text: str) -> list:
     «;» разделяет разные регионы, «//» — варианты одного региона, поэтому
     ВСЕ предложения чанка наследуют его регион; хвост без региона — region=None.
     """
-    normalized = text.replace('//', '. ')
-    region_token = re.compile(r'(' + '|'.join(escaped_regions) + r')(?:\s*;)?')
+    normalized = re.sub(r'(?<=[.!?])\s*//', ' ', text).replace('//', '. ')
+    region_token = re.compile(
+        r'(?<![А-ЯЁа-яё])(' + '|'.join(escaped_regions) + r')(?:\s*[,.])?\s*;?',
+        re.IGNORECASE,
+    )
 
     def sentences(chunk: str, region):
         for sent in split_sentences(chunk):
             sent = re.sub(r'^[.\s]+', '', sent.strip())
             if sent and re.search(r'[А-ЯЁа-яё]', sent):
-                examples.append({"text": normalize_accents(sent), "region": region})
+                examples.append({
+                    "text": normalize_accents(normalize_punctuation(sent)),
+                    "region": region,
+                })
 
     examples = []
     pos = 0
     for m in region_token.finditer(normalized):
-        sentences(normalized[pos:m.start()], m.group(1))
+        sentences(normalized[pos:m.start()], canonical_region(m.group(1)))
         pos = m.end()
     sentences(normalized[pos:], None)
     return examples
@@ -162,7 +199,9 @@ def parse_senses(text: str) -> list:
             sense_data["examples"] = parse_examples(remainder)
         else:
             sentences = split_sentences(sense_text)
-            sense_data["meaning"] = normalize_accents(sentences[0].strip())
+            sense_data["meaning"] = normalize_accents(
+                normalize_punctuation(sentences[0].strip())
+            )
             sense_data["examples"] = parse_examples(' '.join(sentences[1:]))
 
         senses.append(sense_data)
@@ -248,7 +287,7 @@ def process_senses(text: str, entry: dict) -> None:
         region = None
         rm = region_pattern.search(example_text)
         if rm:
-            region = rm.group(1)
+            region = canonical_region(rm.group(1))
             example_text = region_pattern.sub('', example_text).strip().rstrip('.!?')
 
         entry["derived_forms"].append({

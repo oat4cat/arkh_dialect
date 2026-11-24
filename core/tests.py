@@ -3,6 +3,8 @@ from django.test import SimpleTestCase
 import numpy as np
 
 from django.core.exceptions import FieldDoesNotExist
+from scripts.parse_dictionary import parse_examples, parse_senses
+
 from . import concepts_pipeline
 from .filters import LexicalEntryFilter
 from .models import (
@@ -44,6 +46,56 @@ class DatabaseSchemaModelTests(SimpleTestCase):
         self.assertEqual(
             filters.filters["regions"].field_name,
             "senses__texts__region__name",
+        )
+
+
+class DictionaryParserTests(SimpleTestCase):
+    def test_does_not_write_duplicate_periods(self):
+        self.assertEqual(
+            parse_examples("Первый пример.// Второй пример. Вельск."),
+            [
+                {"text": "Первый пример.", "region": "Вельск."},
+                {"text": "Второй пример.", "region": "Вельск."},
+            ],
+        )
+        self.assertEqual(
+            parse_senses("Толкование.. Пример. Вельск.")[0]["meaning"],
+            "Толкование.",
+        )
+
+    def test_nenets_region_variants_are_single_region(self):
+        for region in (
+            "Ненец. авт. округ.",
+            "ненец. авт. округ",
+            "НАО.",
+            "Ненецкий авт. округ.",
+            "Ненецкий автономный округ.",
+        ):
+            with self.subTest(region=region):
+                self.assertEqual(
+                    parse_examples(f"Мы строгани́ну е́ли. {region}"),
+                    [{
+                        "text": "Мы строгани́ну е́ли.",
+                        "region": "Ненец. авт. округ",
+                    }],
+                )
+
+    def test_nenets_region_does_not_capture_following_region_chunk(self):
+        self.assertEqual(
+            parse_examples(
+                "Вот катыши́ подоспе́ли. Ненец. авт. округ.; "
+                "Катыше́й наката́ют. Онеж."
+            ),
+            [
+                {
+                    "text": "Вот катыши́ подоспе́ли.",
+                    "region": "Ненец. авт. округ",
+                },
+                {
+                    "text": "Катыше́й наката́ют.",
+                    "region": "Онеж.",
+                },
+            ],
         )
 
 
