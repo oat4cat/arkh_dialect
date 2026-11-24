@@ -22,11 +22,10 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchAny
 
 COLLECTION = "dictionary_senses"
-# e5-small, копия лежит в проекте (models/e5-small) — сеть не нужна.
-# Запросы эмбеддятся с «query: …», документы индекса — с «passage: …»
-# (utils/build_semantic_index.py). rubert-tiny2 заменена — её вектора
-# в пищевом домене насыщены, дискриминации не даёт.
-EMBED_MODEL_NAME = str(Path(settings.BASE_DIR) / "models" / "e5-small")
+# rubert-mini-frida, локальная копия в проекте (models/rubert-mini-frida,
+# 127 МБ) — сеть не нужна. Замена от 2026-11-24: вдвое выше MAP на бенчмарке
+# и вдвое быстрее запросы, чем у multilingual-e5-small. Префиксы не нужны.
+EMBED_MODEL_NAME = str(Path(settings.BASE_DIR) / "models" / "rubert-mini-frida")
 STORE_PATH = Path(settings.BASE_DIR) / "qdrant_storage"
 TOP_K = 20
 # Пул для переранжирования: берём втрое больше хитов, чем отдаём —
@@ -97,7 +96,7 @@ def index_available():
 
 def embed_query(query):
     model = get_embedder()
-    return model.encode([f"query: {query}"], normalize_embeddings=True).tolist()[0]
+    return model.encode([query], normalize_embeddings=True).tolist()[0]
 
 
 def _payload_filter(filters):

@@ -243,7 +243,7 @@ function refreshSemanticWarmNote() {
     }
     const wordEntered = $('#word').val().trim().length > 0;
     if (!semanticState.warm && wordEntered) {
-        note.text('Загружается модель поиска по смыслу — первый запрос может занять до ~1 минуты, дальше мгновенно. Система думает, а не зависла.');
+        note.text('Загружается модель поиска по смыслу — первый запрос может занять до ~30 секунд, дальше мгновенно. Система думает, а не зависла.');
         note.show();
     } else {
         note.hide();
