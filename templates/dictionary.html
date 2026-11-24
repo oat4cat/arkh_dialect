@@ -48,13 +48,20 @@
 <p class="prolog">Загрузка страницы может занять несколько секунд.</p>
 <div class="word_form filters">
     <label for="word">Слово для поиска:&nbsp;</label>
-    <input type="text" maxlength="28" id="word" name="word">
+    <input type="text" maxlength="28" id="word" name="word" autocomplete="off">
     <label for="word" id="warning" style="display: none;">Только кириллица!</label>
 	<br>
     <button class="filter-button filter">Искать</button>
 	<button class="filter-button" onclick="removeParams()">Очистить поиск</button>
 
 	<button class="filter-button" id="filters-show">Сортировка</button>
+</div>
+<div class="search-history" id="search-history" aria-label="Недавние запросы" hidden>
+    <div class="search-history-header">
+        <span>Недавние запросы</span>
+        <button type="button" class="search-history-clear" id="search-history-clear">Очистить историю</button>
+    </div>
+    <div class="search-history-items" id="search-history-items"></div>
 </div>
 <div class="semantic-controls">
 	<label class="semantic-toggle" title="Семантический поиск на каждый запрос: точные совпадения словоформы первыми, за ними слова, близкие по смыслу. Без галочки поиск по смыслу подтягивается сам, только когда точного совпадения нет">

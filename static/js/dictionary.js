@@ -191,6 +191,120 @@ function getFilters(page_chosen, page_num = 1) {
     };
 }
 
+const SEARCH_HISTORY_KEY = 'arkhdialect.searchHistory';
+const SEARCH_HISTORY_LIMIT = 12;
+let searchHistory = loadSearchHistory();
+
+function normalizeSearchQuery(query) {
+    return String(query || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLocaleLowerCase('ru-RU');
+}
+
+function loadSearchHistory() {
+    try {
+        const stored = localStorage.getItem(SEARCH_HISTORY_KEY);
+        if (!stored) return [];
+
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed)) {
+            throw new Error('История поиска должна быть массивом.');
+        }
+
+        const unique = [];
+        parsed.forEach(query => {
+            const normalized = normalizeSearchQuery(query);
+            if (normalized && !unique.includes(normalized)) {
+                unique.push(normalized);
+            }
+        });
+        return unique.slice(0, SEARCH_HISTORY_LIMIT);
+    } catch (error) {
+        console.warn('Не удалось загрузить историю поиска:', error);
+        try {
+            localStorage.removeItem(SEARCH_HISTORY_KEY);
+        } catch (removeError) {
+            console.warn('Не удалось очистить повреждённую историю поиска:', removeError);
+        }
+        return [];
+    }
+}
+
+function saveSearchHistory() {
+    try {
+        localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(searchHistory));
+    } catch (error) {
+        console.warn('Не удалось сохранить историю поиска:', error);
+    }
+}
+
+function rememberSearchQuery(query) {
+    const normalized = normalizeSearchQuery(query);
+    if (!normalized) return;
+
+    searchHistory = [
+        normalized,
+        ...searchHistory.filter(item => item !== normalized)
+    ].slice(0, SEARCH_HISTORY_LIMIT);
+    saveSearchHistory();
+    renderSearchHistory();
+}
+
+function removeSearchHistoryQuery(query) {
+    const normalized = normalizeSearchQuery(query);
+    searchHistory = searchHistory.filter(item => item !== normalized);
+    saveSearchHistory();
+    renderSearchHistory();
+}
+
+function clearSearchHistory() {
+    searchHistory = [];
+    try {
+        localStorage.removeItem(SEARCH_HISTORY_KEY);
+    } catch (error) {
+        console.warn('Не удалось очистить историю поиска:', error);
+    }
+    renderSearchHistory();
+}
+
+function renderSearchHistory() {
+    const container = document.getElementById('search-history');
+    const itemsContainer = document.getElementById('search-history-items');
+    if (!container || !itemsContainer) return;
+
+    itemsContainer.replaceChildren();
+    searchHistory.forEach(query => {
+        const item = document.createElement('div');
+        item.className = 'search-history-item';
+
+        const replayButton = document.createElement('button');
+        replayButton.type = 'button';
+        replayButton.className = 'search-history-query';
+        replayButton.textContent = query;
+        replayButton.title = `Повторить поиск «${query}»`;
+        replayButton.addEventListener('click', function () {
+            $('#word').val(query);
+            filterWords(getFilters(false));
+        });
+
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'search-history-remove';
+        removeButton.textContent = '×';
+        removeButton.title = `Удалить запрос «${query}» из истории`;
+        removeButton.setAttribute('aria-label', removeButton.title);
+        removeButton.addEventListener('click', function () {
+            removeSearchHistoryQuery(query);
+        });
+
+        item.append(replayButton, removeButton);
+        itemsContainer.appendChild(item);
+    });
+
+    container.hidden = searchHistory.length === 0;
+}
+
 /* 4. Запрос к Django API */
 /**
  * Выполняет AJAX-запрос к серверу для поиска слов и обновления списка результатов.
@@ -200,6 +314,8 @@ function getFilters(page_chosen, page_num = 1) {
  * @returns {void}
  */
 function filterWords(filters) {
+    rememberSearchQuery(filters.word);
+
     // Инструкция (.prolog) показывается только на чистой загрузке страницы;
     // любой пользовательский поиск её скрывает (возврат — «Очистить поиск»/F5)
     $('.prolog, .prolog_list').hide();
@@ -968,6 +1084,9 @@ function removeParams() {
 
 /* 2. Инициализация событий */
 $(document).ready(function () {
+    renderSearchHistory();
+    $('#search-history-clear').on('click', clearSearchHistory);
+
     loadSimpleFilter('/api/regions/', 'dropdown-content-region', 'selected-items-region');
     loadCategories(); // для вложенных категорий
     loadSimpleFilter('/api/pos/', 'dropdown-content-pos', 'selected-items-pos');

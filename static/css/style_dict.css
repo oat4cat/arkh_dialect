@@ -121,6 +121,93 @@ body {
     margin: 20px;
 }
 
+.search-history {
+    margin: -8px 20px 16px;
+    padding: 12px 14px;
+    border: 1px solid rgba(0, 44, 91, 0.3);
+    border-radius: 10px;
+}
+
+.search-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.search-history-clear {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #002C5B;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    text-decoration: underline dotted;
+}
+
+.search-history-clear:hover {
+    color: #004080;
+}
+
+.search-history-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.search-history-item {
+    display: inline-flex;
+    align-items: stretch;
+    overflow: hidden;
+    border: 1px solid rgba(0, 44, 91, 0.45);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.search-history-query,
+.search-history-remove {
+    border: 0;
+    background: transparent;
+    color: #002C5B;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.search-history-query {
+    padding: 5px 9px;
+}
+
+.search-history-remove {
+    padding: 5px 8px;
+    border-left: 1px solid rgba(0, 44, 91, 0.25);
+    color: #8f1616;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.search-history-query:hover,
+.search-history-remove:hover {
+    background: #002C5B;
+    color: #ECEFF6;
+}
+
+@media (max-width: 768px) {
+    .search-history {
+        margin-left: 20px;
+        margin-right: 20px;
+    }
+
+    .search-history-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+
 /* ===== СЛОВАРНАЯ СТАТЬЯ ===== */
 #words {
     margin: 20px 0;
