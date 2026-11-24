@@ -38,12 +38,21 @@
   venv/Scripts/python -X utf8 scripts/migrate_to_db.py [parsed_dictionary_N.json]
   ```
   Скрипт дописывает записи и не очищает старые данные, поэтому перед повторной
-  перезаливкой используйте чистую копию базы со справочниками `Region` и
-  `Subcategory`.
+  перезаливкой очистите словарные данные:
+  ```bash
+  venv/Scripts/python -X utf8 scripts/clear_dictionary_data.py
+  venv/Scripts/python -X utf8 scripts/clear_dictionary_data.py --execute
+  ```
+  Первый запуск только покажет объём очистки. Второй удалит лексемы, формы,
+  толкования, примеры, отношения и концепты, но сохранит таблицы и справочники
+  `Region`, `Category`, `Subcategory`.
 - `scripts/create_concept_tables.py` — создаёт таблицы графа понятий `Concept`/`Concept_Sense` в `dialect.db`.
 
 Полный пересчёт после перезаливки словаря:
 ```bash
+venv/Scripts/python -X utf8 scripts/clear_dictionary_data.py --execute
+venv/Scripts/python -X utf8 scripts/parse_dictionary.py
+venv/Scripts/python -X utf8 scripts/migrate_to_db.py
 venv/Scripts/python scripts/create_concept_tables.py
 venv/Scripts/python manage.py build_concepts
 venv/Scripts/python -X utf8 utils/build_semantic_index.py
