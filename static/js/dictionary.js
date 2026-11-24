@@ -268,6 +268,59 @@ function clearSearchHistory() {
     renderSearchHistory();
 }
 
+function hasSearchCriteria(filters) {
+    return Boolean(
+        normalizeSearchQuery(filters.word) ||
+        filters.subcategories.length ||
+        filters.regions.length ||
+        filters.pos.length
+    );
+}
+
+function updateCsvDownloadButton(filters, hasResults = false) {
+    const button = $('#download-csv');
+    button.prop('hidden', !hasSearchCriteria(filters) || !hasResults);
+}
+
+function downloadSearchCsv() {
+    const filters = getFilters(false);
+    if (!hasSearchCriteria(filters)) {
+        return;
+    }
+
+    fetch('/api/search/export/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify(filters)
+    })
+        .then(async response => {
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null);
+                throw new Error(payload?.error || 'Не удалось подготовить CSV-файл.');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'arkhdialect-results.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            $('#download-message').prop('hidden', false);
+        })
+        .catch(error => {
+            console.error('Ошибка скачивания CSV:', error);
+            window.alert(error.message);
+        });
+}
+
 function renderSearchHistory() {
     const container = document.getElementById('search-history');
     const itemsContainer = document.getElementById('search-history-items');
@@ -315,6 +368,8 @@ function renderSearchHistory() {
  */
 function filterWords(filters) {
     rememberSearchQuery(filters.word);
+    updateCsvDownloadButton(filters);
+    $('#download-message').prop('hidden', true);
 
     // Инструкция (.prolog) показывается только на чистой загрузке страницы;
     // любой пользовательский поиск её скрывает (возврат — «Очистить поиск»/F5)
@@ -328,6 +383,7 @@ function filterWords(filters) {
         success: function (response) {
             renderResults(response.results, response);
             renderPagination(response);
+            updateCsvDownloadButton(filters, response.results.length > 0);
             if (response.semantic) {
                 // семантика отработала — модель точно прогрета
                 semanticState.warm = true;
@@ -1086,6 +1142,10 @@ function removeParams() {
 $(document).ready(function () {
     renderSearchHistory();
     $('#search-history-clear').on('click', clearSearchHistory);
+    $('#download-csv').on('click', downloadSearchCsv);
+    $('#download-message-close').on('click', function () {
+        $('#download-message').prop('hidden', true);
+    });
 
     loadSimpleFilter('/api/regions/', 'dropdown-content-region', 'selected-items-region');
     loadCategories(); // для вложенных категорий
@@ -1129,7 +1189,10 @@ $(document).ready(function () {
     // Семантика: греем модель фоном ещё до первого запроса, заметку о
     // прогреве обновляем по мере ввода слова
     checkSemanticWarm();
-    $('#word').on('input', refreshSemanticWarmNote);
+    $('#word').on('input', function () {
+        refreshSemanticWarmNote();
+        updateCsvDownloadButton(getFilters(false));
+    });
 
     // Первая загрузка при открытии страницы: слова грузятся сразу, инструкция остаётся видна
     filterWords(getFilters(false));

@@ -1,4 +1,5 @@
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
+from unittest.mock import patch
 
 import numpy as np
 
@@ -13,6 +14,59 @@ from .models import (
     SenseSubcategory,
     SenseText,
 )
+from .views import _csv_safe, search_api, search_export_csv
+
+
+class SearchExportTests(SimpleTestCase):
+    def test_rejects_export_without_search_criteria(self):
+        request = RequestFactory().post(
+            "/api/search/export/",
+            data={
+                "word": "",
+                "subcategories": [],
+                "regions": [],
+                "pos": [],
+                "use_semantic": False,
+            },
+            content_type="application/json",
+        )
+
+        response = search_export_csv(request)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_neutralizes_spreadsheet_formulas(self):
+        self.assertEqual(_csv_safe("=1+1"), "'=1+1")
+        self.assertEqual(_csv_safe("  @SUM(A1:A2)"), "'  @SUM(A1:A2)")
+        self.assertEqual(_csv_safe("обычный текст"), "обычный текст")
+
+    @patch("core.views._semantic_results", return_value=[{"word": "кисель"}])
+    @patch("core.views.semantic_search", return_value=[{"sense_id": 1}])
+    @patch("core.views._filtered_entries", return_value=[])
+    def test_semantic_fallback_applies_selected_filters(
+        self,
+        filtered_entries,
+        semantic_search_mock,
+        semantic_results,
+    ):
+        request = RequestFactory().post(
+            "/api/search/",
+            data={"word": "щавель", "pos": ["сущ."]},
+            content_type="application/json",
+        )
+
+        response = search_api(request)
+
+        self.assertEqual(response.status_code, 200)
+        semantic_search_mock.assert_called_once_with(
+            "щавель",
+            filters={
+                "subcategories": [],
+                "regions": [],
+                "pos": ["сущ."],
+            },
+        )
+        semantic_results.assert_called_once()
 
 
 class DatabaseSchemaModelTests(SimpleTestCase):

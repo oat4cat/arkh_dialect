@@ -10,6 +10,7 @@ urlpatterns = [
     
     # API для JS
     path('api/search/', views.search_api, name='search_api'),
+    path('api/search/export/', views.search_export_csv, name='search_export_csv'),
     path('api/map/', views.map_api, name='map_api'),
     path('api/graph/', views.graph_api, name='graph_api'),
     path('api/semantic/status/', views.semantic_status_api, name='semantic_status'),

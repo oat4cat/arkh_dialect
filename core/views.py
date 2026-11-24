@@ -1,8 +1,10 @@
 # core/views.py
+import csv
+import io
 import json
 import re
 from collections import Counter
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.core.paginator import Paginator
 from .filters import LexicalEntryFilter
@@ -136,18 +138,14 @@ def _entry_payload(entry, selected_regions):
     }
 
 
-@require_POST
-def search_api(request):
-    data = json.loads(request.body)
-
-    qs = LexicalEntry.objects.prefetch_related(
+def _filtered_entries(data):
+    queryset = LexicalEntry.objects.prefetch_related(
         "senses__texts__region",
         "senses__subcategories",
         "senses__relations_from__target_sense__lexical_entry",
         "relations_to__source_lexeme",
         "lexical_forms",
     )
-
     entry_filter = LexicalEntryFilter(
         data={
             "word": data.get("word", ""),
@@ -155,21 +153,39 @@ def search_api(request):
             "regions": data.get("regions", []),
             "part_of_speech": data.get("pos", []),
         },
-        queryset=qs,
+        queryset=queryset,
     )
+    if not entry_filter.is_valid():
+        raise ValueError("Некорректные параметры поиска или фильтрации.")
 
-    filtered_qs = entry_filter.qs
-
-    order = int(data.get("order", 0))
     order_map = {
         0: "word",
         1: "-word",
         2: "senses__subcategories__name",
         3: "-senses__subcategories__name",
     }
-    filtered_qs = filtered_qs.order_by(order_map.get(order, "word")).distinct()
-    selected_regions = set(data.get("regions", []))
-    word_query = (data.get("word") or "").strip()
+    order = int(data.get("order", 0))
+    return entry_filter.qs.order_by(order_map.get(order, "word")).distinct()
+
+
+def _has_search_criteria(data):
+    return any((
+        str(data.get("word") or "").strip(),
+        data.get("subcategories"),
+        data.get("regions"),
+        data.get("pos"),
+    ))
+
+
+@require_POST
+def search_api(request):
+    data = json.loads(request.body)
+    try:
+        selected_regions = set(data.get("regions", []))
+        filtered_qs = _filtered_entries(data)
+    except (TypeError, ValueError) as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    word_query = str(data.get("word") or "").strip()
 
     # Режим «поиск по смыслу» (переключатель на странице): точные совпадения
     # первыми, за ними семантика. Без слова режим не включается — семантике
@@ -186,24 +202,23 @@ def search_api(request):
         if payload is not None:
             results.append(payload)
 
-    # Авто-fallback, когда переключатель выключен: точный поиск пуст и задано
-    # только слово (с фильтрами не подмешиваем — иначе неотфильтрованный
-    # векторный результат нельзя было бы отличить от отфильтрованного точного).
-    # Хиты Qdrant джойнятся обратно к SQLite — источнику истины.
+    # Авто-fallback, когда точный поиск пуст: фильтры передаются в Qdrant,
+    # чтобы близкие по смыслу карточки соответствовали выбранному условию.
     semantic = False
-    if (
-        not results
-        and word_query
-        and not data.get("subcategories")
-        and not selected_regions
-        and not data.get("pos")
-    ):
+    if not results and word_query:
         try:
-            hits = semantic_search(word_query)
+            hits = semantic_search(
+                word_query,
+                filters={
+                    "subcategories": data.get("subcategories", []),
+                    "regions": list(selected_regions),
+                    "pos": data.get("pos", []),
+                },
+            )
         except Exception:
             hits = None  # семантика не должна ронять точный поиск
         if hits:
-            results = _semantic_results(hits)
+            results = _semantic_results(hits, selected_regions=selected_regions)
             semantic = bool(results)
 
     return JsonResponse({
@@ -216,20 +231,130 @@ def search_api(request):
     })
 
 
+def _csv_safe(value):
+    text = "" if value is None else str(value)
+    if text.lstrip().startswith(("=", "+", "-", "@")) or text.startswith(
+        ("\t", "\r")
+    ):
+        return f"'{text}"
+    return text
+
+
+def _csv_rows(entry, selected_regions):
+    forms = "; ".join(
+        form.accent or form.form
+        for form in entry.lexical_forms.all()
+    )
+    payload = _entry_payload(entry, selected_regions)
+    if payload is None:
+        return
+
+    for sense in payload["senses"]:
+        examples = sense["examples"] or [{}]
+        for example in examples:
+            yield [
+                entry.word,
+                entry.accent,
+                entry.part_of_speech,
+                entry.grammatical_features,
+                forms,
+                "; ".join(payload["subcategories"]),
+                sense["sense_number"],
+                sense["meaning"],
+                example.get("text"),
+                example.get("region"),
+            ]
+
+
+@require_POST
+def search_export_csv(request):
+    data = json.loads(request.body)
+    if not _has_search_criteria(data):
+        return JsonResponse(
+            {"error": "Укажите слово для поиска или включите хотя бы один фильтр."},
+            status=400,
+        )
+
+    try:
+        selected_regions = set(data.get("regions", []))
+        filtered_qs = _filtered_entries(data)
+    except (TypeError, ValueError) as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    entries = list(filtered_qs)
+    exported_ids = {entry.pk for entry in entries}
+
+    word_query = str(data.get("word") or "").strip()
+    semantic_fallback = not entries and word_query
+    if word_query and (data.get("use_semantic") or semantic_fallback):
+        try:
+            hits = semantic_search(
+                word_query,
+                filters={
+                    "subcategories": data.get("subcategories", []),
+                    "regions": list(selected_regions),
+                    "pos": data.get("pos", []),
+                },
+            )
+        except Exception:
+            hits = []
+        semantic_ids = _semantic_entry_ids(
+            hits,
+            exclude_entry_ids=exported_ids,
+        ) if hits else []
+        semantic_entries = LexicalEntry.objects.filter(
+            pk__in=semantic_ids
+        ).prefetch_related(
+            "senses__texts__region",
+            "senses__subcategories",
+            "lexical_forms",
+        )
+        entries_by_id = {entry.pk: entry for entry in semantic_entries}
+        entries.extend(
+            entries_by_id[entry_id]
+            for entry_id in semantic_ids
+            if entry_id in entries_by_id
+        )
+
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow([
+        "Слово",
+        "Слово с ударением",
+        "Часть речи",
+        "Грамматические характеристики",
+        "Формы",
+        "Тематические группы",
+        "Номер значения",
+        "Толкование",
+        "Пример",
+        "Район",
+    ])
+    for entry in entries:
+        for row in _csv_rows(entry, selected_regions):
+            writer.writerow([_csv_safe(cell) for cell in row])
+
+    response = HttpResponse(
+        "\ufeff" + output.getvalue(),
+        content_type="text/csv; charset=utf-8",
+    )
+    response["Content-Disposition"] = (
+        'attachment; filename="arkhdialect-results.csv"'
+    )
+    return response
+
+
 # Сколько лексем показываем на семантический запрос: как страница точного
 # поиска (Paginator там по 20). Пагинации у fallback-режима нет — точный
 # поиск пуст, листать нечего.
 SEMANTIC_RESULT_LIMIT = 20
 
 
-def _semantic_results(hits, limit=SEMANTIC_RESULT_LIMIT, exclude_entry_ids=frozenset()):
-    """Карточки для семантических совпадений.
-
-    Векторный поиск возвращает толкования; лексемы выводятся по одному разу
-    в порядке лучшего хита (одна лексема может дать несколько хитов — её
-    разные значения). exclude_entry_ids — уже выведенные точной частью
-    (режим «поиск по смыслу»), повторять их не нужно. Данные карточек —
-    из SQLite, как у точного поиска."""
+def _semantic_entry_ids(
+    hits,
+    limit=SEMANTIC_RESULT_LIMIT,
+    exclude_entry_ids=frozenset(),
+):
+    """Идентификаторы лексем из семантических хитов в порядке релевантности."""
     senses = (
         Sense.objects
         .filter(id__in=[hit["sense_id"] for hit in hits])
@@ -237,7 +362,7 @@ def _semantic_results(hits, limit=SEMANTIC_RESULT_LIMIT, exclude_entry_ids=froze
     )
     senses_by_id = {sense.id: sense for sense in senses}
 
-    entry_order = []
+    entry_ids = []
     seen = set()
     for hit in hits:
         sense = senses_by_id.get(hit["sense_id"])
@@ -248,7 +373,20 @@ def _semantic_results(hits, limit=SEMANTIC_RESULT_LIMIT, exclude_entry_ids=froze
         ):
             continue
         seen.add(sense.lexical_entry_id)
-        entry_order.append(sense.lexical_entry_id)
+        entry_ids.append(sense.lexical_entry_id)
+        if len(entry_ids) == limit:
+            break
+    return entry_ids
+
+
+def _semantic_results(
+    hits,
+    limit=SEMANTIC_RESULT_LIMIT,
+    exclude_entry_ids=frozenset(),
+    selected_regions=frozenset(),
+):
+    """Карточки семантических совпадений без повторяющихся лексем."""
+    entry_order = _semantic_entry_ids(hits, limit, exclude_entry_ids)
 
     entries = LexicalEntry.objects.filter(id__in=entry_order).prefetch_related(
         "senses__texts__region",
@@ -263,7 +401,9 @@ def _semantic_results(hits, limit=SEMANTIC_RESULT_LIMIT, exclude_entry_ids=froze
     for entry_id in entry_order[:limit]:
         entry = entries_by_id.get(entry_id)
         if entry:
-            results.append(_entry_payload(entry, set()))
+            payload = _entry_payload(entry, selected_regions)
+            if payload is not None:
+                results.append(payload)
     return results
 
 
@@ -292,7 +432,11 @@ def _semantic_mode_response(filtered_qs, data, word_query, selected_regions):
             },
         )
         if hits:
-            sem_results = _semantic_results(hits, exclude_entry_ids=exact_ids)
+            sem_results = _semantic_results(
+                hits,
+                exclude_entry_ids=exact_ids,
+                selected_regions=selected_regions,
+            )
     except Exception:
         pass  # семантика не должна ронять точный поиск
 

@@ -53,8 +53,11 @@
 	<br>
     <button class="filter-button filter">Искать</button>
 	<button class="filter-button" onclick="removeParams()">Очистить поиск</button>
-
 	<button class="filter-button" id="filters-show">Сортировка</button>
+    <button type="button" class="filter-button" id="download-csv" hidden
+            title="Скачать все результаты текущего поиска">
+        Скачать результаты в CSV
+    </button>
 </div>
 <div class="search-history" id="search-history" aria-label="Недавние запросы" hidden>
     <div class="search-history-header">
@@ -68,6 +71,14 @@
 		<input type="checkbox" id="semantic-toggle">
 		всегда искать по смыслу
 	</label>
+</div>
+<div class="download-message" id="download-message" role="status" hidden>
+    <button type="button" class="download-message-close" id="download-message-close"
+            aria-label="Скрыть сообщение">×</button>
+    <span>Приятного исследования! Не забудьте сослаться на наши работы:</span>
+    <a href="https://arkhdialect.narfu.ru/#researches" target="_blank" rel="noopener noreferrer">
+        список публикаций проекта
+    </a>.
 </div>
 <div id="semantic-warm-note" class="semantic-warm-note" style="display: none;"></div>
 <!-- Кнопки фильтрации по категориям -->
@@ -122,8 +133,11 @@
     </div>
 
     <div id='words'></div>
-    <div id="pagination"></div>
+</div>
 
+<footer class="dictionary-footer" aria-label="Навигация по результатам">
+    <div id="pagination"></div>
+</footer>
 
     <script>
         const selectedItemsSubcategory = new Set();

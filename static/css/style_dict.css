@@ -368,6 +368,42 @@ body {
     color: #eceff6;
 }
 
+#download-csv[hidden] {
+    display: none;
+}
+
+.download-message {
+    position: relative;
+    margin: 12px 20px;
+    padding: 14px 42px 14px 16px;
+    border: 1px solid rgba(0, 44, 91, 0.45);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.55);
+    line-height: 1.5;
+}
+
+.download-message[hidden] {
+    display: none;
+}
+
+.download-message a {
+    color: #002C5B;
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+.download-message-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    border: 0;
+    background: transparent;
+    color: #8f1616;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+}
+
 .filters-container {
     max-height: 0px;
     opacity: 0;
@@ -710,20 +746,26 @@ body {
     background: #004080;
 }
 
-/* Подвал */
-.footer {
+/* Подвал словаря и пагинация */
+.dictionary-footer {
     background-color: #002C5B;
-    margin: 30px 0 0 0;
-    padding: 25px 0;
-    position: absolute;
+    box-sizing: border-box;
+    margin: 30px 0 0;
+    padding: 20px 4%;
     width: 100%;
-    left: 0;
     color: #ECEFF6;
 }
 
-.footer p {
-    text-align: center;
-    margin: 10px 0;
+.dictionary-footer #pagination {
+    width: 100%;
+}
+
+.dictionary-footer .pagination-row {
+    margin: 0;
+}
+
+.dictionary-footer .to_page {
+    margin: 10px auto 0;
 }
 
 /* Поля ввода */
